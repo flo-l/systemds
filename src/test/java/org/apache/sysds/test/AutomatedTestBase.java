@@ -650,6 +650,12 @@ public abstract class AutomatedTestBase {
 	protected void rowFederateLocallyAndWriteInputMatrixWithMTD(String name,
 		double[][] matrix, int numFederatedWorkers, List<Integer> ports, double[][] ranges)
 	{
+		rowFederateLocallyAndWriteInputMatrixWithMTD(name, matrix, numFederatedWorkers, ports, ranges, null);
+	}
+
+	protected void rowFederateLocallyAndWriteInputMatrixWithMTD(String name,
+		double[][] matrix, int numFederatedWorkers, List<Integer> ports, double[][] ranges, PrivacyConstraint privacyConstraint)
+	{
 		// check matrix non empty
 		if(matrix.length == 0 || matrix[0].length == 0)
 			return;
@@ -674,7 +680,7 @@ public abstract class AutomatedTestBase {
 			// write slice
 			writeInputMatrixWithMTD(path, Arrays.copyOfRange(matrix, (int)lowerBound, (int)upperBound),
 				false, new MatrixCharacteristics((long) examplesForWorkerI, ncol,
-				OptimizerUtils.DEFAULT_BLOCKSIZE, (long) examplesForWorkerI * ncol));
+				OptimizerUtils.DEFAULT_BLOCKSIZE, (long) examplesForWorkerI * ncol), privacyConstraint);
 
 			// generate fedmap entry
 			FederatedRange range = new FederatedRange(new long[]{(long) lowerBound, 0}, new long[]{(long) upperBound, ncol});
@@ -685,7 +691,7 @@ public abstract class AutomatedTestBase {
 		federatedMatrixObject.setFedMapping(new FederationMap(FederationUtils.getNextFedDataID(), fedHashMap));
 		federatedMatrixObject.getFedMapping().setType(FederationMap.FType.ROW);
 
-		writeInputFederatedWithMTD(name, federatedMatrixObject, null);
+		writeInputFederatedWithMTD(name, federatedMatrixObject, privacyConstraint);
 	}
 
 	protected double[][] generateBalancedFederatedRowRanges(int numFederatedWorkers, int dataSetSize) {
