@@ -55,6 +55,7 @@ import org.apache.sysds.runtime.instructions.cp.StringObject;
 import org.apache.sysds.runtime.matrix.data.MatrixBlock;
 import org.apache.sysds.runtime.matrix.operators.RightScalarOperator;
 import org.apache.sysds.runtime.lineage.LineageItem;
+import org.apache.sysds.runtime.privacy.PrivacyConstraint;
 import org.apache.sysds.runtime.util.ProgramConverter;
 import org.apache.sysds.utils.Statistics;
 
@@ -83,6 +84,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 	private final boolean _weighting;
 	private double _weightingFactor = 1;
 	private boolean _cycleStartAt0 = false;
+	private boolean _use_homomorphic_encryption = false;
 
 	public FederatedPSControlThread(int workerID, String updFunc, Statement.PSFrequency freq,
 		PSRuntimeBalancing runtimeBalancing, boolean weighting, int epochs, long batchSize,
@@ -564,7 +566,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 			// model clean up
 			ParamservUtils.cleanupListObject(ec, ec.getVariable(Statement.PS_FED_MODEL_VARID).toString());
 			// TODO double check cleanup gradients and models
-			
+
 			// stop timing
 			DoubleObject gradientsTime = new DoubleObject(tGradients.stop());
 			return new FederatedResponse(FederatedResponse.ResponseType.SUCCESS,
@@ -608,4 +610,22 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 	protected void accGradientComputeTime(Timing time) {
 		throw new NotImplementedException();
 	}
+
+	private void checkHomomorphicEncryption(MatrixObject obj) {
+		PrivacyConstraint pc = obj.getPrivacyConstraint();
+		_use_homomorphic_encryption = _use_homomorphic_encryption || (pc != null && pc.hasPrivateElements());
+	}
+
+	@Override
+	public void setFeatures(MatrixObject features) {
+		checkHomomorphicEncryption(features);
+		super.setFeatures(features);
+	}
+
+	@Override
+	public void setLabels(MatrixObject labels) {
+		checkHomomorphicEncryption(labels);
+		super.setLabels(labels);
+	}
+
 }
