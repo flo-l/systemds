@@ -83,10 +83,12 @@ import org.apache.sysds.runtime.controlprogram.paramserv.dp.DataPartitionFederat
 import org.apache.sysds.runtime.controlprogram.paramserv.dp.DataPartitionLocalScheme;
 import org.apache.sysds.runtime.controlprogram.paramserv.dp.FederatedDataPartitioner;
 import org.apache.sysds.runtime.controlprogram.paramserv.dp.LocalDataPartitioner;
+import org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption.PublicKey;
 import org.apache.sysds.runtime.controlprogram.paramserv.rpc.PSRpcFactory;
 import org.apache.sysds.runtime.controlprogram.parfor.stat.InfrastructureAnalyzer;
 import org.apache.sysds.runtime.controlprogram.parfor.stat.Timing;
 import org.apache.sysds.runtime.matrix.operators.Operator;
+import org.apache.sysds.runtime.privacy.PrivacyConstraint;
 import org.apache.sysds.runtime.util.ProgramConverter;
 import org.apache.sysds.utils.Statistics;
 
@@ -190,21 +192,45 @@ public class ParamservBuiltinCPInstruction extends ParameterizedBuiltinCPInstruc
 		boolean modelAvg = Boolean.parseBoolean(getParam(PS_MODELAVG));
 		ParamServer ps = createPS(PSModeType.FEDERATED, aggFunc, updateType, freq, workerNum, model, aggServiceEC, getValFunction(),
 			getNumBatchesPerEpoch(runtimeBalancing, result._balanceMetrics), val_features, val_labels, nbatches, modelAvg);
+
+		// check if we need homomorphic encryption
+		boolean use_homomorphic_encryption_ = false;
+		for (int i = 0; i < workerNum; i++) {
+			use_homomorphic_encryption_ = use_homomorphic_encryption_ || checkIsPrivate(result._pFeatures.get(i));
+			use_homomorphic_encryption_ = use_homomorphic_encryption_ || checkIsPrivate(result._pLabels.get(i));
+		}
+		final boolean use_homomorphic_encryption = use_homomorphic_encryption_;
+
 		// Create the local workers
 		int finalNumBatchesPerEpoch = getNumBatchesPerEpoch(runtimeBalancing, result._balanceMetrics);
 		List<FederatedPSControlThread> threads = IntStream.range(0, workerNum)
 			.mapToObj(i -> new FederatedPSControlThread(i, updFunc, freq, runtimeBalancing, weighting,
-				getEpochs(), getBatchSize(), finalNumBatchesPerEpoch, federatedWorkerECs.get(i), ps, nbatches, modelAvg))
+				getEpochs(), getBatchSize(), finalNumBatchesPerEpoch, federatedWorkerECs.get(i), ps, nbatches, modelAvg, use_homomorphic_encryption))
 			.collect(Collectors.toList());
 		if(workerNum != threads.size()) {
 			throw new DMLRuntimeException("ParamservBuiltinCPInstruction: Federated data partitioning does not match threads!");
 		}
+
 		// Set features and lables for the control threads and write the program and instructions and hyperparams to the federated workers
 		for (int i = 0; i < threads.size(); i++) {
 			threads.get(i).setFeatures(result._pFeatures.get(i));
 			threads.get(i).setLabels(result._pLabels.get(i));
 			threads.get(i).setup(result._weightingFactors.get(i));
 		}
+
+		if (use_homomorphic_encryption) {
+			// generate public key from partial public keys
+			PublicKey public_key = new PublicKey();
+			for (FederatedPSControlThread federatedPSControlThread : threads) {
+				PublicKey partial_public_key = federatedPSControlThread.getPartialPublicKey();
+				// TODO: accumulate public keys with SEAL
+			}
+
+			for (FederatedPSControlThread thread : threads) {
+				thread.setPublicKey(public_key);
+			}
+		}
+
 		if (DMLScript.STATISTICS)
 			Statistics.accPSSetupTime((long) tSetup.stop());
 
@@ -612,5 +638,10 @@ public class ParamservBuiltinCPInstruction extends ParameterizedBuiltinCPInstruc
 			return DEFAULT_NBATCHES;
 		}
 		return Integer.parseInt(getParam(PS_NBATCHES));
+	}
+
+	private boolean checkIsPrivate(MatrixObject obj) {
+		PrivacyConstraint pc = obj.getPrivacyConstraint();
+		return pc != null && pc.hasPrivateElements();
 	}
 }

@@ -23,7 +23,6 @@ import org.apache.commons.lang.NotImplementedException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.yarn.webapp.hamlet2.Hamlet;
 import org.apache.sysds.api.DMLScript;
 import org.apache.sysds.parser.DataIdentifier;
 import org.apache.sysds.parser.Statement;
@@ -87,10 +86,11 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 	private double _weightingFactor = 1;
 	private boolean _cycleStartAt0 = false;
 	private boolean _use_homomorphic_encryption = false;
+	private PublicKey _partial_public_key;
 
 	public FederatedPSControlThread(int workerID, String updFunc, Statement.PSFrequency freq,
 		PSRuntimeBalancing runtimeBalancing, boolean weighting, int epochs, long batchSize,
-		int numBatchesPerGlobalEpoch, ExecutionContext ec, ParamServer ps, int nbatches, boolean modelAvg)
+		int numBatchesPerGlobalEpoch, ExecutionContext ec, ParamServer ps, int nbatches, boolean modelAvg, boolean use_homomorphic_encryption)
 	{
 		super(workerID, updFunc, freq, epochs, batchSize, ec, ps, nbatches, modelAvg);
 
@@ -101,6 +101,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 		// generate the ID for the model
 		_modelVarID = FederationUtils.getNextFedDataID();
 		_modelAvg = _use_homomorphic_encryption || modelAvg; // we always have to use modelAvg when using homomorphic encryption
+		_use_homomorphic_encryption = use_homomorphic_encryption;
 	}
 
 	/**
@@ -305,6 +306,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 
         @Override
         public FederatedResponse execute(ExecutionContext ec, Data... data) {
+			// TODO: set other CKKS parameters
 			// TODO generate partial public key
 			PublicKey partial_pubkey = new PublicKey();
 
@@ -319,6 +321,27 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 		/**
 	 * Teardown UDF executed on the federated worker
 	 */
+	private static class SetPublicKeyFederatedWorker extends FederatedUDF {
+		private static final long serialVersionUID = -1536502123123318969L;
+		private PublicKey _public_key;
+
+		protected SetPublicKeyFederatedWorker(PublicKey public_key) {
+			super(new long[]{});
+			_public_key = public_key;
+		}
+
+		@Override
+		public FederatedResponse execute(ExecutionContext ec, Data... data) {
+			ec.setVariable(Statement.PS_FED_HE_PUBKEY, _public_key.toData());
+			return new FederatedResponse(FederatedResponse.ResponseType.SUCCESS);
+		}
+
+		@Override
+		public Pair<String, LineageItem> getLineageItem(ExecutionContext ec) {
+			return null;
+		}
+	}
+
 	private static class TeardownFederatedWorker extends FederatedUDF {
 		private static final long serialVersionUID = -153650281873318969L;
 
@@ -667,21 +690,23 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 		throw new NotImplementedException();
 	}
 
-	private void checkHomomorphicEncryption(MatrixObject obj) {
-		PrivacyConstraint pc = obj.getPrivacyConstraint();
-		_use_homomorphic_encryption = _use_homomorphic_encryption || (pc != null && pc.hasPrivateElements());
+	public PublicKey getPartialPublicKey() {
+		return _partial_public_key;
 	}
 
-	@Override
-	public void setFeatures(MatrixObject features) {
-		checkHomomorphicEncryption(features);
-		super.setFeatures(features);
-	}
+	public void setPublicKey(PublicKey public_key) {
+		Future<FederatedResponse> res = _featuresData.executeFederatedOperation(
+				new FederatedRequest(RequestType.EXEC_UDF, _featuresData.getVarID(),
+						new SetPublicKeyFederatedWorker(public_key)));
 
-	@Override
-	public void setLabels(MatrixObject labels) {
-		checkHomomorphicEncryption(labels);
-		super.setLabels(labels);
-	}
+		try {
+			FederatedResponse response = res.get();
+			if(!response.isSuccessful())
+				throw new DMLRuntimeException("FederatedLocalPSThread: SetPublicKey UDF failed");
 
+		}
+		catch(Exception e) {
+			throw new DMLRuntimeException("FederatedLocalPSThread: failed to execute Public Key Setup UDF" + e.getMessage());
+		}
+	}
 }
