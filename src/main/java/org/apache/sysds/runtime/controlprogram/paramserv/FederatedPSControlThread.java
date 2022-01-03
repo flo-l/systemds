@@ -23,6 +23,7 @@ import org.apache.commons.lang.NotImplementedException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.yarn.webapp.hamlet2.Hamlet;
 import org.apache.sysds.api.DMLScript;
 import org.apache.sysds.parser.DataIdentifier;
 import org.apache.sysds.parser.Statement;
@@ -40,6 +41,7 @@ import org.apache.sysds.runtime.controlprogram.federated.FederatedRequest.Reques
 import org.apache.sysds.runtime.controlprogram.federated.FederatedResponse;
 import org.apache.sysds.runtime.controlprogram.federated.FederatedUDF;
 import org.apache.sysds.runtime.controlprogram.federated.FederationUtils;
+import org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption.PublicKey;
 import org.apache.sysds.runtime.controlprogram.parfor.stat.Timing;
 import org.apache.sysds.runtime.functionobjects.Multiply;
 import org.apache.sysds.runtime.instructions.Instruction;
@@ -98,7 +100,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 		_numBatchesPerNbatch = nbatches;
 		// generate the ID for the model
 		_modelVarID = FederationUtils.getNextFedDataID();
-		_modelAvg = modelAvg;
+		_modelAvg = _use_homomorphic_encryption || modelAvg; // we always have to use modelAvg when using homomorphic encryption
 	}
 
 	/**
@@ -162,20 +164,46 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 			PROG_END);
 
 		// write program and meta data to worker
-		Future<FederatedResponse> udfResponse = _featuresData.executeFederatedOperation(
-			new FederatedRequest(RequestType.EXEC_UDF, _featuresData.getVarID(),
-				new SetupFederatedWorker(_batchSize, dataSize, _possibleBatchesPerLocalEpoch,
-					programSerialized, _inst.getNamespace(), _inst.getFunctionName(),
-					_ps.getAggInst().getFunctionName(), _ec.getListObject("hyperparams"),
-					_modelVarID, _nbatches, _modelAvg)));
+		Future<FederatedResponse> udfResponse;
+		//_use_homomorphic_encryption = false;
+		if (_use_homomorphic_encryption) {
+			// TODO: generate a here
+			PublicKey a = new PublicKey();
+			// generate pk[i] on each client and return it
+			udfResponse = _featuresData.executeFederatedOperation(
+					new FederatedRequest(RequestType.EXEC_UDF, _featuresData.getVarID(),
+							new SetupHEFederatedWorker(_batchSize, dataSize, _possibleBatchesPerLocalEpoch,
+									programSerialized, _inst.getNamespace(), _inst.getFunctionName(),
+									_ps.getAggInst().getFunctionName(), _ec.getListObject("hyperparams"),
+									_modelVarID, _nbatches, a)));
+		} else {
+			udfResponse = _featuresData.executeFederatedOperation(
+					new FederatedRequest(RequestType.EXEC_UDF, _featuresData.getVarID(),
+							new SetupFederatedWorker(_batchSize, dataSize, _possibleBatchesPerLocalEpoch,
+									programSerialized, _inst.getNamespace(), _inst.getFunctionName(),
+									_ps.getAggInst().getFunctionName(), _ec.getListObject("hyperparams"),
+									_modelVarID, _nbatches, _modelAvg)));
+		}
 
+		FederatedResponse response;
 		try {
-			FederatedResponse response = udfResponse.get();
+			response = udfResponse.get();
 			if(!response.isSuccessful())
 				throw new DMLRuntimeException("FederatedLocalPSThread: Setup UDF failed");
+
 		}
 		catch(Exception e) {
 			throw new DMLRuntimeException("FederatedLocalPSThread: failed to execute Setup UDF" + e.getMessage());
+		}
+		if (_use_homomorphic_encryption) {
+			PublicKey partial_public_key;
+			try {
+				partial_public_key = (PublicKey) response.getData()[0];
+			}
+			catch (Exception e) {
+				throw new DMLRuntimeException("FederatedLocalPSThread: HE Setup UDF didn't return an object");
+			}
+			// TODO HE: calculate and distribute pk to clients
 		}
 	}
 
@@ -198,7 +226,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 			throw new DMLRuntimeException("FederatedLocalPSThread: failed to execute Teardown UDF" + e.getMessage());
 		}
 	}
-	
+
 	/**
 	 * Setup UDF executed on the federated worker
 	 */
@@ -260,7 +288,35 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 		}
 	}
 
-	/**
+	private static class SetupHEFederatedWorker extends SetupFederatedWorker {
+		private static final long serialVersionUID = 9128347291804980123L;
+
+		PublicKey _partial_pubkey_a;
+
+        protected SetupHEFederatedWorker(long batchSize, long dataSize, int possibleBatchesPerLocalEpoch,
+                                         String programString, String namespace, String gradientsFunctionName, String aggregationFunctionName,
+                                         ListObject hyperParams, long modelVarID, int nbatches, PublicKey partial_pubkey_a) {
+            // delegate everything to parent class. set modelAvg to true, as it is the only supported case
+            super(batchSize, dataSize, possibleBatchesPerLocalEpoch, programString, namespace, gradientsFunctionName,
+                    aggregationFunctionName, hyperParams, modelVarID, nbatches, true);
+
+            _partial_pubkey_a = partial_pubkey_a;
+        }
+
+        @Override
+        public FederatedResponse execute(ExecutionContext ec, Data... data) {
+			// TODO generate partial public key
+			PublicKey partial_pubkey = new PublicKey();
+
+			FederatedResponse res = super.execute(ec, data);
+			if (!res.isSuccessful()) {
+				return res;
+			}
+
+			return new FederatedResponse(FederatedResponse.ResponseType.SUCCESS, partial_pubkey);
+        }
+    }
+		/**
 	 * Teardown UDF executed on the federated worker
 	 */
 	private static class TeardownFederatedWorker extends FederatedUDF {
