@@ -97,7 +97,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 
 		_numBatchesPerEpoch = numBatchesPerGlobalEpoch;
 		_runtimeBalancing = runtimeBalancing;
-		_weighting = weighting;
+		_weighting = weighting && (!use_homomorphic_encryption); // FIXME: this disables weighting in favor of homomorphic encryption
 		_numBatchesPerNbatch = nbatches;
 		// generate the ID for the model
 		_modelVarID = FederationUtils.getNextFedDataID();
@@ -408,7 +408,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 	}
 
 	protected void weightAndPushGradients(ListObject gradients) {
-		assert (!(_weighting && _use_homomorphic_encryption)); // unsupported
+		assert (!(_weighting && _use_homomorphic_encryption)) : "weights and homomorphic encryption are not supported together";
 		// scale gradients - must only include MatrixObjects
 		if(_weighting && _weightingFactor != 1) {
 			Timing tWeighting = DMLScript.STATISTICS ? new Timing(true) : null;

@@ -360,7 +360,8 @@ public class FederatedWorkerHandler extends ChannelInboundHandlerAdapter {
 		// get function and input parameters
 		FederatedUDF udf = (FederatedUDF) request.getParam(0);
 		Data[] inputs = Arrays.stream(udf.getInputIDs()).mapToObj(id -> ec.getVariable(String.valueOf(id)))
-			.map(PrivacyMonitor::handlePrivacy).toArray(Data[]::new);
+			.toArray(Data[]::new);
+		// 	.map(PrivacyMonitor::handlePrivacy).toArray(Data[]::new);
 
 		// trace lineage
 		if(DMLScript.LINEAGE)

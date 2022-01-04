@@ -8,17 +8,12 @@ import org.apache.sysds.runtime.instructions.cp.ListObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /// This class implements Homomorphic Encryption (HE) for LocalParamServer. It only supports modelAvg=true.
 public class HEParamServer extends LocalParamServer {
     private int _thread_counter = 0;
-    private final Lock _lock = new ReentrantLock();
-    private final Condition _all_threads_done = _lock.newCondition();
     private final List<FederatedPSControlThread> _threads;
     private final List<Object> _result_buffer; // one per thread
     private Object result;
@@ -59,23 +54,19 @@ public class HEParamServer extends LocalParamServer {
 
     // this method collects all T Objects from each worker into a list and then calls f once on this list to produce
     // another T, which it returns.
-    private <T> T collectAndDo(int workerId, T obj, Function<List<T>, T> f) {
-        final boolean last;
-        synchronized (this) {
-            _result_buffer.set(workerId, obj);
-            _thread_counter++;
-            last = _thread_counter == getNumWorkers();
-        }
+    private synchronized <T> T collectAndDo(int workerId, T obj, Function<List<T>, T> f) {
+        _result_buffer.set(workerId, obj);
+        _thread_counter++;
 
-        if (last) {
+        if (_thread_counter == getNumWorkers()) {
             List<T> buf = _result_buffer.stream().map(x -> (T)x).collect(Collectors.toList());
             result = f.apply(buf);
             resetResultBuffer();
             _thread_counter = 0;
-            _all_threads_done.signalAll();
+            notifyAll();
         } else {
             try {
-                _all_threads_done.await();
+                wait();
             } catch (InterruptedException i) {
                 throw new RuntimeException("thread interrupted");
             }
@@ -84,14 +75,22 @@ public class HEParamServer extends LocalParamServer {
         return (T)result;
     }
 
+    private ListObject sum(List<ListObject> summands) {
+        ListObject sum = summands.get(0);
+        for (int i = 1; i < summands.size(); i++) {
+            ParamservUtils.accrueGradients(sum, summands.get(i), true);
+        }
+        return sum;
+    }
+
     private ListObject homomorphicAggregation(List<ListObject> encrypted_models) {
         // TODO: implement with SEAL
-        return null;
+        return sum(encrypted_models);
     }
 
     private ListObject homomorphicDecryption(List<ListObject> partial_decryptions) {
         // TODO: implement with SEAL
-        return null;
+        return sum(partial_decryptions);
     }
 
     @Override
