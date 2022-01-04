@@ -472,6 +472,10 @@ public abstract class ParamServer
 			Statistics.accPSValidationTime((long) tValidate.stop());
 	}
 
+	public int getNumWorkers() {
+		return _numWorkers;
+	}
+
 	public FunctionCallCPInstruction getAggInst() {
 		return _inst;
 	}

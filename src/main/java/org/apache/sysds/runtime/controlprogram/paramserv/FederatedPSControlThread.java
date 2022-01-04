@@ -63,6 +63,7 @@ import org.apache.sysds.utils.Statistics;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
@@ -111,6 +112,9 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 	 */
 	public void setup(double weightingFactor) {
 		incWorkerNumber();
+		if (_use_homomorphic_encryption) {
+			((HEParamServer)_ps).registerThread(_workerID, this);
+		}
 
 		// prepare features and labels
 		_featuresData = _features.getFedMapping().getFederatedData()[0];
@@ -204,7 +208,6 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 			catch (Exception e) {
 				throw new DMLRuntimeException("FederatedLocalPSThread: HE Setup UDF didn't return an object");
 			}
-			// TODO HE: calculate and distribute pk to clients
 		}
 	}
 
@@ -405,6 +408,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 	}
 
 	protected void weightAndPushGradients(ListObject gradients) {
+		assert (!(_weighting && _use_homomorphic_encryption)); // unsupported
 		// scale gradients - must only include MatrixObjects
 		if(_weighting && _weightingFactor != 1) {
 			Timing tWeighting = DMLScript.STATISTICS ? new Timing(true) : null;
@@ -512,11 +516,16 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 		}
 
 		// create and execute the udf on the remote worker
+		Object udf;
+		if (_use_homomorphic_encryption) {
+			udf = new HEComputeGradientsForNBatches(new long[]{_featuresData.getVarID(), _labelsData.getVarID(),
+					_modelVarID}, numBatchesToCompute, localUpdate, localStartBatchNum);
+		} else {
+			udf = new federatedComputeGradientsForNBatches(new long[]{_featuresData.getVarID(), _labelsData.getVarID(),
+					_modelVarID}, numBatchesToCompute, localUpdate, localStartBatchNum);
+		}
 		Future<FederatedResponse> udfResponse = _featuresData.executeFederatedOperation(
-			new FederatedRequest(RequestType.EXEC_UDF, _featuresData.getVarID(),
-				new federatedComputeGradientsForNBatches(new long[]{_featuresData.getVarID(), _labelsData.getVarID(),
-				_modelVarID}, numBatchesToCompute, localUpdate, localStartBatchNum)
-		));
+				new FederatedRequest(RequestType.EXEC_UDF, _featuresData.getVarID(), udf));
 
 		try {
 			Object[] responseData = udfResponse.get().getData();
@@ -573,12 +582,12 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 			ArrayList<DataIdentifier> inputs = func.getInputParams();
 			ArrayList<DataIdentifier> outputs = func.getOutputParams();
 			CPOperand[] boundInputs = inputs.stream()
-				.map(input -> new CPOperand(input.getName(), input.getValueType(), input.getDataType()))
-				.toArray(CPOperand[]::new);
+					.map(input -> new CPOperand(input.getName(), input.getValueType(), input.getDataType()))
+					.toArray(CPOperand[]::new);
 			ArrayList<String> outputNames = outputs.stream().map(DataIdentifier::getName)
-				.collect(Collectors.toCollection(ArrayList::new));
+					.collect(Collectors.toCollection(ArrayList::new));
 			Instruction gradientsInstruction = new FunctionCallCPInstruction(namespace, gradientsFunc,
-				opt, boundInputs, func.getInputParamNames(), outputNames, "gradient function");
+					opt, boundInputs, func.getInputParamNames(), outputNames, "gradient function");
 			DataIdentifier gradientsOutput = outputs.get(0);
 
 			// recreate aggregation instruction and output if needed
@@ -589,12 +598,12 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 				inputs = func.getInputParams();
 				outputs = func.getOutputParams();
 				boundInputs = inputs.stream()
-					.map(input -> new CPOperand(input.getName(), input.getValueType(), input.getDataType()))
-					.toArray(CPOperand[]::new);
+						.map(input -> new CPOperand(input.getName(), input.getValueType(), input.getDataType()))
+						.toArray(CPOperand[]::new);
 				outputNames = outputs.stream().map(DataIdentifier::getName)
-					.collect(Collectors.toCollection(ArrayList::new));
+						.collect(Collectors.toCollection(ArrayList::new));
 				aggregationInstruction = new FunctionCallCPInstruction(namespace, aggFunc,
-					opt, boundInputs, func.getInputParamNames(), outputNames, "aggregation function");
+						opt, boundInputs, func.getInputParamNames(), outputNames, "aggregation function");
 				aggregationOutput = outputs.get(0);
 			}
 			ListObject accGradients = null;
@@ -621,7 +630,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 				// accrue the computed gradients - In the single batch case this is just a list copy
 				// is this equivalent for momentum based and AMS prob?
 				accGradients = modelAvg ? null :
-					ParamservUtils.accrueGradients(accGradients, gradients, false);
+						ParamservUtils.accrueGradients(accGradients, gradients, false);
 
 				// update the local model with gradients if needed
 				// FIXME ensure that with modelAvg we always update the model
@@ -649,13 +658,83 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 			// stop timing
 			DoubleObject gradientsTime = new DoubleObject(tGradients.stop());
 			return new FederatedResponse(FederatedResponse.ResponseType.SUCCESS,
-				new Object[]{modelAvg ? model : accGradients, gradientsTime});
+					new Object[]{modelAvg ? model : accGradients, gradientsTime});
 		}
 
 		@Override
 		public Pair<String, LineageItem> getLineageItem(ExecutionContext ec) {
 			return null;
 		}
+	}
+
+
+	/**
+	 * This wraps federatedComputeGradientsForNBatches and adds encryption
+	 */
+	private static class HEComputeGradientsForNBatches extends federatedComputeGradientsForNBatches {
+		private static final long serialVersionUID = -3535901512348794852L;
+
+		protected HEComputeGradientsForNBatches(long[] inIDs, int numBatchesToCompute, boolean localUpdate, int localStartBatchNum) {
+			super(inIDs, numBatchesToCompute, localUpdate, localStartBatchNum);
+		}
+
+		@Override
+		public FederatedResponse execute(ExecutionContext ec, Data... data) {
+			Timing tGradients = new Timing(true);
+			FederatedResponse res = super.execute(ec, data);
+
+			if (!res.isSuccessful()) {
+				return res;
+			}
+
+			// TODO: encrypt model with SEAL
+			//ListObject model = (ListObject) res.getData()[0];
+
+			// stop timing
+			DoubleObject gradientsTime = new DoubleObject(tGradients.stop());
+			try {
+				res.getData()[1] = gradientsTime;
+			} catch (Exception e) {
+				return new FederatedResponse(FederatedResponse.ResponseType.ERROR, new Object[] { e });
+			}
+			return res;
+		}
+	}
+
+	private static class HEComputePartialDecryption extends FederatedUDF {
+		private static final long serialVersionUID = -4535098129348794852L;
+		private final ListObject _encrypted_sum;
+
+		protected HEComputePartialDecryption(ListObject encrypted_sum) {
+			super(new long[]{});
+			_encrypted_sum = encrypted_sum;
+		}
+
+		@Override
+		public FederatedResponse execute(ExecutionContext ec, Data... data) {
+			// TODO: implement with SEAL
+			return new FederatedResponse(FederatedResponse.ResponseType.SUCCESS, _encrypted_sum);
+		}
+
+		@Override
+		public Pair<String, LineageItem> getLineageItem(ExecutionContext ec) {
+			return null;
+		}
+	}
+
+
+	public ListObject getPartialDecryption(ListObject encrypted_sum) {
+		Object udf = new HEComputePartialDecryption(encrypted_sum);
+		Future<FederatedResponse> udfResponse = _featuresData.executeFederatedOperation(
+				new FederatedRequest(RequestType.EXEC_UDF, _featuresData.getVarID(), udf));
+
+		try {
+			Object[] responseData = udfResponse.get().getData();
+			return (ListObject) responseData[0];
+		} catch(Exception e) {
+			throw new DMLRuntimeException("FederatedLocalPSThread: failed to execute UDF" + e.getMessage());
+		}
+
 	}
 
 	// Statistics methods
