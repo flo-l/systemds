@@ -688,6 +688,13 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 			}
 
 			// TODO: encrypt model with SEAL
+			//	for each matrix
+			//		for each block of size SEAL_slot_count
+			//			extract block from DenseMatrixBlock into long[]
+			//			call into SEAL and encrypt the block
+			//			store encrypted block in result matrix
+			//		store matrix in result (possible size change)
+
 			//ListObject model = (ListObject) res.getData()[0];
 
 			// stop timing
@@ -703,9 +710,9 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 
 	private static class HEComputePartialDecryption extends FederatedUDF {
 		private static final long serialVersionUID = -4535098129348794852L;
-		private final ListObject _encrypted_sum;
+		private final long[][] _encrypted_sum;
 
-		protected HEComputePartialDecryption(ListObject encrypted_sum) {
+		protected HEComputePartialDecryption(long[][] encrypted_sum) {
 			super(new long[]{});
 			_encrypted_sum = encrypted_sum;
 		}
@@ -723,14 +730,14 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 	}
 
 
-	public ListObject getPartialDecryption(ListObject encrypted_sum) {
+	public long[][] getPartialDecryption(long[][] encrypted_sum) {
 		Object udf = new HEComputePartialDecryption(encrypted_sum);
 		Future<FederatedResponse> udfResponse = _featuresData.executeFederatedOperation(
 				new FederatedRequest(RequestType.EXEC_UDF, _featuresData.getVarID(), udf));
 
 		try {
 			Object[] responseData = udfResponse.get().getData();
-			return (ListObject) responseData[0];
+			return (long[][]) responseData[0];
 		} catch(Exception e) {
 			throw new DMLRuntimeException("FederatedLocalPSThread: failed to execute UDF" + e.getMessage());
 		}

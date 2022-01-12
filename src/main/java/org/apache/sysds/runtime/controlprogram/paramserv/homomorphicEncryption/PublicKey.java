@@ -33,6 +33,7 @@ public class PublicKey implements Serializable {
         */
 
         // TODO: maybe find a better representation of this (Matrix? [bad bc it needs a file], a new Data subclass?)
+        // the right data type is MatrixBlock or even better long[]
         IntObject[] data_ary = new IntObject[size];
         for (int i = 0; i < size; i++) {
             // TODO: copy data
