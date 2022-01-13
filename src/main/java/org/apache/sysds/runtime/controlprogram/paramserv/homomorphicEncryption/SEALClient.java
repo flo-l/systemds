@@ -32,7 +32,7 @@ public class SEALClient {
 
     // generates a partial public key and returns it
     // stores a partial private key corresponding to the partial public key in ctx
-    public native PublicKey generatePartialPublicKey();
+    public native PublicKey generatePartialPublicKey(PublicKey a);
 
     // sets the public key and stores it in ctx
     public native void setPublicKey(PublicKey public_key);

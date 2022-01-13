@@ -59,6 +59,10 @@ public class HEParamServer extends LocalParamServer {
         }
     }
 
+    public PublicKey generateA() {
+        return _seal_server.generateA();
+    }
+
     public PublicKey aggregatePartialPublicKeys(PublicKey[] partial_public_keys) {
         return _seal_server.aggregatePartialPublicKeys(partial_public_keys);
     }

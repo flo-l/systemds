@@ -165,7 +165,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 		//_use_homomorphic_encryption = false;
 		if (_use_homomorphic_encryption) {
 			// TODO: generate a here
-			PublicKey a = null;
+			PublicKey a = ((HEParamServer)_ps).generateA();
 			// generate pk[i] on each client and return it
 			udfResponse = _featuresData.executeFederatedOperation(
 					new FederatedRequest(RequestType.EXEC_UDF, _featuresData.getVarID(),
@@ -305,7 +305,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 			// TODO generate partial public key
 			SEALClient sc = new SEALClient();
 			ec.setSealClient(sc);
-			PublicKey partial_pubkey = sc.generatePartialPublicKey();
+			PublicKey partial_pubkey = sc.generatePartialPublicKey(_partial_pubkey_a);
 
 			FederatedResponse res = super.execute(ec, data);
 			if (!res.isSuccessful()) {

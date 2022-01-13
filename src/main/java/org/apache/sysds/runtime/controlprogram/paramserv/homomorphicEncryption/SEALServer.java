@@ -30,6 +30,9 @@ public class SEALServer {
     // NOTICE: all double[] arys here have to be half the size of SEAL slot_count
     // they represent the data of one Plaintext object
 
+    // this generates the a constant. in a future version we want to generate this together with the clients to prevent misuse
+    public native PublicKey generateA();
+
     // accumulates the given partial public keys into a public key, stores it in ctx and returns it
     public native PublicKey aggregatePartialPublicKeys(PublicKey[] partial_public_keys);
 
