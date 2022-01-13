@@ -17,27 +17,35 @@ JNIEXPORT void JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_ho
 
 /*
  * Class:     org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALServer
- * Method:    accumulatePartialPublicKeys
- * Signature: ([[J)[J
+ * Method:    generateA
+ * Signature: ()Ljava/lang/Object;
  */
-JNIEXPORT jlongArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALServer_accumulatePartialPublicKeys
+JNIEXPORT jobject JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALServer_generateA
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALServer
+ * Method:    aggregatePartialPublicKeys
+ * Signature: ([Ljava/lang/Object;)Ljava/lang/Object;
+ */
+JNIEXPORT jobject JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALServer_aggregatePartialPublicKeys
   (JNIEnv *, jobject, jobjectArray);
 
 /*
  * Class:     org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALServer
  * Method:    accumulateCiphertexts
- * Signature: ([[J)[J
+ * Signature: ([Ljava/lang/Object;)Ljava/lang/Object;
  */
-JNIEXPORT jlongArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALServer_accumulateCiphertexts
+JNIEXPORT jobject JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALServer_accumulateCiphertexts
   (JNIEnv *, jobject, jobjectArray);
 
 /*
  * Class:     org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALServer
- * Method:    averageBlocks
- * Signature: ([J[[D)[D
+ * Method:    average
+ * Signature: (Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
  */
-JNIEXPORT jdoubleArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALServer_averageBlocks
-  (JNIEnv *, jobject, jlongArray, jobjectArray);
+JNIEXPORT jobject JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALServer_average
+  (JNIEnv *, jobject, jobject, jobjectArray);
 
 #ifdef __cplusplus
 }

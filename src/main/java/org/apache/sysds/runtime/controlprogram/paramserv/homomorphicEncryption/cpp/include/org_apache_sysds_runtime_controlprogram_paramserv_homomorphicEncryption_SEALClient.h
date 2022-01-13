@@ -18,34 +18,34 @@ JNIEXPORT void JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_ho
 /*
  * Class:     org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALClient
  * Method:    generatePartialPublicKey
- * Signature: ()[J
+ * Signature: (Ljava/lang/Object;)Ljava/lang/Object;
  */
-JNIEXPORT jlongArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALClient_generatePartialPublicKey
-  (JNIEnv *, jobject);
+JNIEXPORT jobject JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALClient_generatePartialPublicKey
+  (JNIEnv *, jobject, jobject);
 
 /*
  * Class:     org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALClient
  * Method:    setPublicKey
- * Signature: ([J)V
+ * Signature: (Ljava/lang/Object;)V
  */
 JNIEXPORT void JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALClient_setPublicKey
-  (JNIEnv *, jobject, jlongArray);
+  (JNIEnv *, jobject, jobject);
 
 /*
  * Class:     org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALClient
- * Method:    encryptBlock
- * Signature: ([D)[J
+ * Method:    encrypt
+ * Signature: (Ljava/lang/Object;)Ljava/lang/Object;
  */
-JNIEXPORT jlongArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALClient_encryptBlock
-  (JNIEnv *, jobject, jdoubleArray);
+JNIEXPORT jobject JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALClient_encrypt
+  (JNIEnv *, jobject, jobject);
 
 /*
  * Class:     org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALClient
- * Method:    partiallyDecryptBlock
- * Signature: ([J)[D
+ * Method:    partiallyDecrypt
+ * Signature: (Ljava/lang/Object;)Ljava/lang/Object;
  */
-JNIEXPORT jdoubleArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALClient_partiallyDecryptBlock
-  (JNIEnv *, jobject, jlongArray);
+JNIEXPORT jobject JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_homomorphicEncryption_SEALClient_partiallyDecrypt
+  (JNIEnv *, jobject, jobject);
 
 #ifdef __cplusplus
 }
