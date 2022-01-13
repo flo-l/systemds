@@ -3,7 +3,6 @@ package org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption;
 import org.apache.sysds.runtime.controlprogram.caching.MatrixObject;
 import org.apache.sysds.runtime.instructions.cp.CiphertextMatrix;
 import org.apache.sysds.runtime.instructions.cp.PlaintextMatrix;
-import org.apache.sysds.runtime.matrix.data.MatrixBlock;
 
 public class SEALServer {
     static {
@@ -32,7 +31,7 @@ public class SEALServer {
     // they represent the data of one Plaintext object
 
     // accumulates the given partial public keys into a public key, stores it in ctx and returns it
-    public native PublicKey accumulatePartialPublicKeys(PublicKey[] partial_public_keys);
+    public native PublicKey aggregatePartialPublicKeys(PublicKey[] partial_public_keys);
 
     // accumulates the given ciphertext blocks into a sum ciphertext and returns it
     // stores c0 of the sum to be used in averageBlocks()

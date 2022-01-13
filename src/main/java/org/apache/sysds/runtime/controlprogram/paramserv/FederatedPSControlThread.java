@@ -165,7 +165,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 		//_use_homomorphic_encryption = false;
 		if (_use_homomorphic_encryption) {
 			// TODO: generate a here
-			PublicKey a = new PublicKey();
+			PublicKey a = null;
 			// generate pk[i] on each client and return it
 			udfResponse = _featuresData.executeFederatedOperation(
 					new FederatedRequest(RequestType.EXEC_UDF, _featuresData.getVarID(),

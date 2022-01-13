@@ -3,6 +3,7 @@ package org.apache.sysds.runtime.controlprogram.paramserv;
 import org.apache.sysds.parser.Statement;
 import org.apache.sysds.runtime.controlprogram.caching.MatrixObject;
 import org.apache.sysds.runtime.controlprogram.context.ExecutionContext;
+import org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption.PublicKey;
 import org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption.SEALServer;
 import org.apache.sysds.runtime.instructions.cp.CiphertextMatrix;
 import org.apache.sysds.runtime.instructions.cp.ListObject;
@@ -56,6 +57,10 @@ public class HEParamServer extends LocalParamServer {
         for (int i = 0; i < getNumWorkers(); i++) {
             _result_buffer.add(null);
         }
+    }
+
+    public PublicKey aggregatePartialPublicKeys(PublicKey[] partial_public_keys) {
+        return _seal_server.aggregatePartialPublicKeys(partial_public_keys);
     }
 
     // this method collects all T Objects from each worker into a list and then calls f once on this list to produce

@@ -216,11 +216,13 @@ public class ParamservBuiltinCPInstruction extends ParameterizedBuiltinCPInstruc
 
 		if (use_homomorphic_encryption) {
 			// generate public key from partial public keys
-			PublicKey public_key = new PublicKey();
-			for (FederatedPSControlThread federatedPSControlThread : threads) {
-				PublicKey partial_public_key = federatedPSControlThread.getPartialPublicKey();
-				// TODO: accumulate public keys with SEAL
+			PublicKey[] partial_public_keys = new PublicKey[threads.size()];
+			for (int i = 0; i < threads.size(); i++) {
+				partial_public_keys[i] = threads.get(i).getPartialPublicKey();
 			}
+
+			// TODO: accumulate public keys with SEAL
+			PublicKey public_key = ((HEParamServer)ps).aggregatePartialPublicKeys(partial_public_keys);
 
 			for (FederatedPSControlThread thread : threads) {
 				thread.setPublicKey(public_key);
