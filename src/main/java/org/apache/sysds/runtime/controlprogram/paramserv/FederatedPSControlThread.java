@@ -41,29 +41,21 @@ import org.apache.sysds.runtime.controlprogram.federated.FederatedResponse;
 import org.apache.sysds.runtime.controlprogram.federated.FederatedUDF;
 import org.apache.sysds.runtime.controlprogram.federated.FederationUtils;
 import org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption.PublicKey;
+import org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption.SEALClient;
 import org.apache.sysds.runtime.controlprogram.parfor.stat.Timing;
 import org.apache.sysds.runtime.functionobjects.Multiply;
 import org.apache.sysds.runtime.instructions.Instruction;
 import org.apache.sysds.runtime.instructions.InstructionUtils;
-import org.apache.sysds.runtime.instructions.cp.BooleanObject;
-import org.apache.sysds.runtime.instructions.cp.CPOperand;
-import org.apache.sysds.runtime.instructions.cp.Data;
-import org.apache.sysds.runtime.instructions.cp.DoubleObject;
-import org.apache.sysds.runtime.instructions.cp.FunctionCallCPInstruction;
-import org.apache.sysds.runtime.instructions.cp.IntObject;
-import org.apache.sysds.runtime.instructions.cp.ListObject;
-import org.apache.sysds.runtime.instructions.cp.StringObject;
+import org.apache.sysds.runtime.instructions.cp.*;
 import org.apache.sysds.runtime.matrix.data.MatrixBlock;
 import org.apache.sysds.runtime.matrix.operators.RightScalarOperator;
 import org.apache.sysds.runtime.lineage.LineageItem;
-import org.apache.sysds.runtime.privacy.PrivacyConstraint;
 import org.apache.sysds.runtime.util.ProgramConverter;
 import org.apache.sysds.utils.Statistics;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
@@ -311,7 +303,9 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
         public FederatedResponse execute(ExecutionContext ec, Data... data) {
 			// TODO: set other CKKS parameters
 			// TODO generate partial public key
-			PublicKey partial_pubkey = new PublicKey();
+			SEALClient sc = new SEALClient();
+			ec.setSealClient(sc);
+			PublicKey partial_pubkey = sc.generatePartialPublicKey();
 
 			FederatedResponse res = super.execute(ec, data);
 			if (!res.isSuccessful()) {
@@ -326,7 +320,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 	 */
 	private static class SetPublicKeyFederatedWorker extends FederatedUDF {
 		private static final long serialVersionUID = -1536502123123318969L;
-		private PublicKey _public_key;
+		private final PublicKey _public_key;
 
 		protected SetPublicKeyFederatedWorker(PublicKey public_key) {
 			super(new long[]{});
@@ -335,7 +329,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 
 		@Override
 		public FederatedResponse execute(ExecutionContext ec, Data... data) {
-			ec.setVariable(Statement.PS_FED_HE_PUBKEY, _public_key.toData());
+			ec.getSealClient().setPublicKey(_public_key);
 			return new FederatedResponse(FederatedResponse.ResponseType.SUCCESS);
 		}
 
@@ -687,19 +681,19 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 				return res;
 			}
 
-			// TODO: encrypt model with SEAL
-			//	for each matrix
-			//		for each block of size SEAL_slot_count
-			//			extract block from DenseMatrixBlock into long[]
-			//			call into SEAL and encrypt the block
-			//			store encrypted block in result matrix
-			//		store matrix in result (possible size change)
-
-			//ListObject model = (ListObject) res.getData()[0];
-
-			// stop timing
-			DoubleObject gradientsTime = new DoubleObject(tGradients.stop());
+			// encrypt model with SEAL
 			try {
+				ListObject model = (ListObject) res.getData()[0];
+				ListObject encrypted_model = new ListObject(model);
+				for (int matrix_idx = 0; matrix_idx < model.getLength(); matrix_idx++) {
+					CiphertextMatrix encrypted_matrix = ec.getSealClient().encrypt((MatrixObject) encrypted_model.getData(matrix_idx));
+					encrypted_model.set(matrix_idx, encrypted_matrix);
+				}
+				// overwrite model with encryption
+				res.getData()[0] = encrypted_model;
+
+				// stop timing
+				DoubleObject gradientsTime = new DoubleObject(tGradients.stop());
 				res.getData()[1] = gradientsTime;
 			} catch (Exception e) {
 				return new FederatedResponse(FederatedResponse.ResponseType.ERROR, new Object[] { e });
@@ -710,17 +704,20 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 
 	private static class HEComputePartialDecryption extends FederatedUDF {
 		private static final long serialVersionUID = -4535098129348794852L;
-		private final long[][] _encrypted_sum;
+		private final CiphertextMatrix[] _encrypted_sum;
 
-		protected HEComputePartialDecryption(long[][] encrypted_sum) {
+		protected HEComputePartialDecryption(CiphertextMatrix[] encrypted_sum) {
 			super(new long[]{});
 			_encrypted_sum = encrypted_sum;
 		}
 
 		@Override
 		public FederatedResponse execute(ExecutionContext ec, Data... data) {
-			// TODO: implement with SEAL
-			return new FederatedResponse(FederatedResponse.ResponseType.SUCCESS, _encrypted_sum);
+			PlaintextMatrix[] result = new PlaintextMatrix[_encrypted_sum.length];
+			for (int i = 0; i < result.length; i++) {
+				result[i] = ec.getSealClient().partiallyDecrypt(_encrypted_sum[i]);
+			}
+			return new FederatedResponse(FederatedResponse.ResponseType.SUCCESS, result);
 		}
 
 		@Override
@@ -730,18 +727,17 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 	}
 
 
-	public long[][] getPartialDecryption(long[][] encrypted_sum) {
+	public PlaintextMatrix[] getPartialDecryption(CiphertextMatrix[] encrypted_sum) {
 		Object udf = new HEComputePartialDecryption(encrypted_sum);
 		Future<FederatedResponse> udfResponse = _featuresData.executeFederatedOperation(
 				new FederatedRequest(RequestType.EXEC_UDF, _featuresData.getVarID(), udf));
 
 		try {
 			Object[] responseData = udfResponse.get().getData();
-			return (long[][]) responseData[0];
+			return (PlaintextMatrix[]) responseData[0];
 		} catch(Exception e) {
 			throw new DMLRuntimeException("FederatedLocalPSThread: failed to execute UDF" + e.getMessage());
 		}
-
 	}
 
 	// Statistics methods

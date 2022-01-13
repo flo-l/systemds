@@ -1,5 +1,9 @@
 package org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption;
 
+import org.apache.sysds.runtime.controlprogram.caching.MatrixObject;
+import org.apache.sysds.runtime.instructions.cp.CiphertextMatrix;
+import org.apache.sysds.runtime.instructions.cp.PlaintextMatrix;
+
 public class SEALClient {
     static {
         System.load("/var/home/me/Dokumente/uni/01_master/masterarbeit/systemds/src/main/java/org/apache/sysds/runtime/controlprogram/paramserv/homomorphicEncryption/cpp/target/libseal_implementation.so");
@@ -28,19 +32,18 @@ public class SEALClient {
 
     // generates a partial public key and returns it
     // stores a partial private key corresponding to the partial public key in ctx
-    public native long[] generatePartialPublicKey();
+    public native PublicKey generatePartialPublicKey();
 
     // sets the public key and stores it in ctx
-    public native void setPublicKey(long[] public_key);
+    public native void setPublicKey(PublicKey public_key);
 
     // encrypts one block of data with public key stored statically and returns it
     // setPublicKey() must have been called before calling this
     // half_block is half the size of SEAL slot_count
-    public native long[] encryptBlock(double[] plaintext);
+    public native CiphertextMatrix encrypt(MatrixObject plaintext);
 
     // partially decrypts one block with the partial private key. generatePartialPublicKey() must
     // have been called before calling this function
     //  returns a block half the size of SEAL slot_count
-    public native double[] partiallyDecryptBlock(long[] ciphertext);
-
+    public native PlaintextMatrix partiallyDecrypt(CiphertextMatrix ciphertext);
 }
