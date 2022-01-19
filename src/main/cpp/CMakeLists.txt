@@ -31,8 +31,8 @@ option(USE_OPEN_BLAS "Whether to use OpenBLAS (Defaults to compiling with Intel 
 option(USE_INTEL_MKL "Whether to use Intel MKL (Defaults to compiling with Intel MKL)" OFF)
 
 # Build a shared libraray
-set(HEADER_FILES libmatrixdnn.h libmatrixmult.h systemds.h common.h)
-set(SOURCE_FILES libmatrixdnn.cpp libmatrixmult.cpp systemds.cpp)
+set(HEADER_FILES libmatrixdnn.h libmatrixmult.h libhe.h systemds.h common.h)
+set(SOURCE_FILES libmatrixdnn.cpp libmatrixmult.cpp libhe.cpp systemds.cpp)
 
 # Build a shared libraray
 add_library(systemds SHARED ${SOURCE_FILES} ${HEADER_FILES})
@@ -80,6 +80,9 @@ elseif(USE_INTEL_MKL)
   set(MATH_LIBRARIES "${MKL_LIBRARIES}")
   add_definitions(-DUSE_INTEL_MKL)
 endif()
+
+find_package(SEAL 3.7 REQUIRED)
+target_link_libraries(systemds SEAL::seal)
 
 # Include directories. (added for Linux & Darwin, fix later for windows)
 # include paths can be spurious

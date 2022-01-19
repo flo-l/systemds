@@ -44,14 +44,14 @@ import org.apache.commons.lang.SystemUtils;
  * By default, it first tries to load Intel MKL, else tries to load OpenBLAS.
  */
 public class NativeHelper {
-	
+
 	public enum NativeBlasState {
 		NOT_ATTEMPTED_LOADING_NATIVE_BLAS,
 		SUCCESSFULLY_LOADED_NATIVE_BLAS_AND_IN_USE,
 		SUCCESSFULLY_LOADED_NATIVE_BLAS_AND_NOT_IN_USE,
 		ATTEMPTED_LOADING_NATIVE_BLAS_UNSUCCESSFULLY
 	}
-	
+
 	public static NativeBlasState CURRENT_NATIVE_BLAS_STATE = NativeBlasState.NOT_ATTEMPTED_LOADING_NATIVE_BLAS;
 	private static String blasType;
 
@@ -63,16 +63,16 @@ public class NativeHelper {
 
 	/**
 	 * Called by Statistics to print the loaded BLAS.
-	 * 
+	 *
 	 * @return empty string or the BLAS that is loaded
 	 */
 	public static String getCurrentBLAS() {
 		return blasType != null ? blasType : "";
 	}
-	
+
 	/**
 	 * Called by runtime to check if the BLAS is available for exploitation
-	 * 
+	 *
 	 * @return true if CURRENT_NATIVE_BLAS_STATE is SUCCESSFULLY_LOADED_NATIVE_BLAS_AND_NOT_IN_USE else false
 	 */
 	public static boolean isNativeLibraryLoaded() {
@@ -99,10 +99,10 @@ public class NativeHelper {
 		}
 		return CURRENT_NATIVE_BLAS_STATE == NativeBlasState.SUCCESSFULLY_LOADED_NATIVE_BLAS_AND_IN_USE;
 	}
-	
+
 	/**
-	 * Initialize the native library before executing the DML program 
-	 * 
+	 * Initialize the native library before executing the DML program
+	 *
 	 * @param customLibPath specified by sysds.native.blas.directory
 	 * @param userSpecifiedBLAS specified by sysds.native.blas
 	 */
@@ -121,22 +121,22 @@ public class NativeHelper {
 			performLoading(customLibPath, userSpecifiedBLAS);
 		}
 	}
-	
+
 	/**
 	 * Return true if the given BLAS type is supported.
-	 * 
+	 *
 	 * @param userSpecifiedBLAS BLAS type specified via sysds.native.blas property
 	 * @return true if the userSpecifiedBLAS is auto | mkl | openblas, else false
 	 */
 	private static boolean isSupportedBLAS(String userSpecifiedBLAS) {
-		return userSpecifiedBLAS.equalsIgnoreCase("auto") || 
-				userSpecifiedBLAS.equalsIgnoreCase("mkl") || 
+		return userSpecifiedBLAS.equalsIgnoreCase("auto") ||
+				userSpecifiedBLAS.equalsIgnoreCase("mkl") ||
 				userSpecifiedBLAS.equalsIgnoreCase("openblas");
 	}
-	
+
 	/**
 	 * Note: we only support 64 bit Java on x86 and AMD machine
-	 * 
+	 *
 	 * @return true if the hardware architecture is supported
 	 */
 	private static boolean isSupportedArchitecture() {
@@ -166,21 +166,21 @@ public class NativeHelper {
 	 * 		   SUCCESSFULLY_LOADED_NATIVE_BLAS_AND_NOT_IN_USE
 	 */
 	private static boolean isBLASLoaded() {
-		return CURRENT_NATIVE_BLAS_STATE == NativeBlasState.SUCCESSFULLY_LOADED_NATIVE_BLAS_AND_IN_USE || 
+		return CURRENT_NATIVE_BLAS_STATE == NativeBlasState.SUCCESSFULLY_LOADED_NATIVE_BLAS_AND_IN_USE ||
 				CURRENT_NATIVE_BLAS_STATE == NativeBlasState.SUCCESSFULLY_LOADED_NATIVE_BLAS_AND_NOT_IN_USE;
 	}
-	
+
 	/**
 	 * Check if we should attempt to perform loading.
 	 * If custom library path is provided, we should attempt to load again if not already loaded.
-	 * 
-	 * @param customLibPath custom library path 
+	 *
+	 * @param customLibPath custom library path
 	 * @return true if we should attempt to load blas again
 	 */
 	private static boolean shouldReload(String customLibPath) {
 		boolean isValidBLASDirectory = customLibPath != null && !customLibPath.equalsIgnoreCase("none");
 		return CURRENT_NATIVE_BLAS_STATE == NativeBlasState.NOT_ATTEMPTED_LOADING_NATIVE_BLAS ||
-			   (isValidBLASDirectory && !isBLASLoaded());
+				(isValidBLASDirectory && !isBLASLoaded());
 	}
 
 	// Performing loading in a method instead of a static block will throw a detailed stack trace in case of fatal errors
@@ -191,13 +191,13 @@ public class NativeHelper {
 		// attemptedLoading variable ensures that we don't try to load SystemDS and other dependencies
 		// again and again especially in the parfor (hence the double-checking with synchronized).
 		if(shouldReload(customLibPath) && isSupportedBLAS(userSpecifiedBLAS) && isSupportedArchitecture()
-			&& isSupportedOS()) {
+				&& isSupportedOS()) {
 			long start = System.nanoTime();
 			synchronized(NativeHelper.class) {
 				if(shouldReload(customLibPath)) {
 					// Set attempted loading unsuccessful in case of exception
 					CURRENT_NATIVE_BLAS_STATE = NativeBlasState.ATTEMPTED_LOADING_NATIVE_BLAS_UNSUCCESSFULLY;
-					String [] blas = new String[] { userSpecifiedBLAS }; 
+					String [] blas = new String[] { userSpecifiedBLAS };
 					if(userSpecifiedBLAS.equalsIgnoreCase("auto")) {
 						blas = new String[] { "mkl", "openblas" };
 					}
@@ -206,7 +206,7 @@ public class NativeHelper {
 						String platform_suffix = (SystemUtils.IS_OS_WINDOWS ? "-Windows-AMD64.dll" : "-Linux-x86_64.so");
 						String library_name = "libsystemds_" + blasType + platform_suffix;
 						if(loadLibraryHelperFromResource(library_name) ||
-						   loadBLAS(customLibPath, library_name,"Loading native helper with customLibPath."))
+								loadBLAS(customLibPath, library_name,"Loading native helper with customLibPath."))
 						{
 							LOG.info("Using native blas: " + blasType + getNativeBLASPath());
 							CURRENT_NATIVE_BLAS_STATE = NativeBlasState.SUCCESSFULLY_LOADED_NATIVE_BLAS_AND_IN_USE;
@@ -215,15 +215,15 @@ public class NativeHelper {
 				}
 			}
 			double timeToLoadInMilliseconds = (System.nanoTime()-start)*1e-6;
-			if(timeToLoadInMilliseconds > 1000) 
+			if(timeToLoadInMilliseconds > 1000)
 				LOG.warn("Time to load native blas: " + timeToLoadInMilliseconds + " milliseconds.");
 		}
 		else if(LOG.isDebugEnabled() && !isSupportedBLAS(userSpecifiedBLAS)) {
 			LOG.debug("Using internal Java BLAS as native BLAS support instead of the configuration " +
-				"'sysds.native.blas'=" + userSpecifiedBLAS + ".");
+					"'sysds.native.blas'=" + userSpecifiedBLAS + ".");
 		}
 	}
-	
+
 	private static boolean checkAndLoadBLAS(String customLibPath, String [] listBLAS) {
 		if(customLibPath != null && customLibPath.equalsIgnoreCase("none"))
 			customLibPath = null;
@@ -250,10 +250,10 @@ public class NativeHelper {
 		}
 		return isLoaded;
 	}
-	
+
 	/**
 	 * Useful method for debugging.
-	 * 
+	 *
 	 * @return empty string (if !LOG.isDebugEnabled()) or the path from where openblas or mkl is loaded.
 	 */
 	private static String getNativeBLASPath() {
@@ -287,8 +287,8 @@ public class NativeHelper {
 
 	/**
 	 * Attempts to load native BLAS
-	 * 
-	 * @param customLibPath can be null (if we want to only want to use LD_LIBRARY_PATH), else the 
+	 *
+	 * @param customLibPath can be null (if we want to only want to use LD_LIBRARY_PATH), else the
 	 * @param blas can be gomp, openblas or mkl_rt
 	 * @param optionalMsg message for debugging
 	 * @return true if successfully loaded BLAS
@@ -300,8 +300,8 @@ public class NativeHelper {
 			try {
 				// This fixes libPath if it already contained a prefix/suffix and mapLibraryName added another one.
 				libPath = libPath.replace("liblibsystemds", "libsystemds")
-								 .replace(".dll.dll", ".dll")
-								 .replace(".so.so", ".so");
+						.replace(".dll.dll", ".dll")
+						.replace(".so.so", ".so");
 				System.load(libPath);
 				LOG.info("Loaded the library:" + libPath);
 				return true;
@@ -321,7 +321,7 @@ public class NativeHelper {
 		catch (UnsatisfiedLinkError e) {
 			LOG.debug("java.library.path: " + System.getProperty("java.library.path"));
 			LOG.debug("Unable to load " + blas + (optionalMsg == null ? "" : (" (" + optionalMsg + ")")) +
-				" \n Message from exception was: " + e.getMessage());
+					" \n Message from exception was: " + e.getMessage());
 			return false;
 		}
 	}
@@ -355,13 +355,13 @@ public class NativeHelper {
 	}
 
 	// TODO: Add pmm, wsloss, mmchain, etc.
-	
+
 	//double-precision matrix multiply dense-dense
 	public static native long dmmdd(double [] m1, double [] m2, double [] ret, int m1rlen, int m1clen, int m2clen,
-									   int numThreads);
+									int numThreads);
 	//single-precision matrix multiply dense-dense
 	public static native long smmdd(FloatBuffer m1, FloatBuffer m2, FloatBuffer ret, int m1rlen, int m1clen, int m2clen,
-									   int numThreads);
+									int numThreads);
 	//transpose-self matrix multiply
 	public static native long tsmm(double[] m1, double[] ret, int m1rlen, int m1clen, boolean leftTrans, int numThreads);
 
@@ -374,27 +374,27 @@ public class NativeHelper {
 
 	// Returns -1 if failures or returns number of nonzeros
 	// Called by DnnCPInstruction if both input and filter are dense
-	public static native long conv2dDense(double [] input, double [] filter, double [] ret, int N, int C, int H, int W, 
-			int K, int R, int S, int stride_h, int stride_w, int pad_h, int pad_w, int P, int Q, int numThreads);
+	public static native long conv2dDense(double [] input, double [] filter, double [] ret, int N, int C, int H, int W,
+										  int K, int R, int S, int stride_h, int stride_w, int pad_h, int pad_w, int P, int Q, int numThreads);
 
 	public static native long dconv2dBiasAddDense(double [] input, double [] bias, double [] filter, double [] ret, int N,
-		int C, int H, int W, int K, int R, int S, int stride_h, int stride_w, int pad_h, int pad_w, int P, int Q,
-												 int numThreads);
+												  int C, int H, int W, int K, int R, int S, int stride_h, int stride_w, int pad_h, int pad_w, int P, int Q,
+												  int numThreads);
 
 	public static native long sconv2dBiasAddDense(FloatBuffer input, FloatBuffer bias, FloatBuffer filter, FloatBuffer ret,
-		int N, int C, int H, int W, int K, int R, int S, int stride_h, int stride_w, int pad_h, int pad_w, int P, int Q,
-												 int numThreads);
+												  int N, int C, int H, int W, int K, int R, int S, int stride_h, int stride_w, int pad_h, int pad_w, int P, int Q,
+												  int numThreads);
 
 	// Called by DnnCPInstruction if both input and filter are dense
 	public static native long conv2dBackwardFilterDense(double [] input, double [] dout, double [] ret, int N, int C,
-													   int H, int W, int K, int R, int S, int stride_h, int stride_w,
-													   int pad_h, int pad_w, int P, int Q, int numThreads);
+														int H, int W, int K, int R, int S, int stride_h, int stride_w,
+														int pad_h, int pad_w, int P, int Q, int numThreads);
 
 	// If both filter and dout are dense, then called by DnnCPInstruction
 	// Else, called by LibMatrixDNN's thread if filter is dense. dout[n] is converted to dense if sparse.
 	public static native long conv2dBackwardDataDense(double [] filter, double [] dout, double [] ret, int N, int C,
-													 int H, int W, int K, int R, int S, int stride_h, int stride_w,
-													 int pad_h, int pad_w, int P, int Q, int numThreads);
+													  int H, int W, int K, int R, int S, int stride_h, int stride_w,
+													  int pad_h, int pad_w, int P, int Q, int numThreads);
 
 	// Currently only supported with numThreads = 1 and sparse input
 	// Called by LibMatrixDNN's thread if input is sparse. dout[n] is converted to dense if sparse.
@@ -415,4 +415,50 @@ public class NativeHelper {
 	// different tradeoffs. In current implementation, we always use GetPrimitiveArrayCritical as it has proven to be
 	// fastest. We can revisit this decision later and hence I would not recommend removing this method.
 	private static native void setMaxNumThreads(int numThreads);
+
+	// ----------------------------------------------------------------------------------------------------------------
+	// SEAL integration
+	// ----------------------------------------------------------------------------------------------------------------
+
+	// these are called by SEALClient
+
+	// generates a Client object and returns a pointer to it as long
+	public static native long initClient(byte[] a);
+
+	// generates a partial public key and returns it
+	// stores a partial private key corresponding to the partial public key in client
+	public static native byte[] generatePartialPublicKey(long client);
+
+	// sets the public key and stores it in client
+	public static native void setPublicKey(long client, byte[] public_key);
+
+	// encrypts data with public key stored in client and returns it
+	// setPublicKey() must have been called before calling this
+	public static native byte[] encrypt(long client, double[] plaintexts);
+
+	// partially decrypts ciphertexts with the partial private key. generatePartialPublicKey() must
+	// have been called before calling this function
+	public static native byte[] partiallyDecrypt(long client, byte[] ciphertexts);
+
+	// ----------------------------------------------------------------------------------------------------------------
+
+	// these are called by SEALServer
+
+	// generates the Server object and returns a pointer to it as long
+	public static native long initServer();
+
+	// this generates the a constant. in a future version we want to generate this together with the clients to prevent misuse
+	public static native byte[] generateA(long server);
+
+	// accumulates the given partial public keys into a public key, stores it in server and returns it
+	public static native byte[] aggregatePartialPublicKeys(long server, byte[][] partial_public_keys);
+
+	// accumulates the given ciphertexts into a sum ciphertext and returns it
+	// stores c0 of the sum to be used in averageBlocks()
+	public static native byte[] accumulateCiphertexts(long server, byte[][] ciphertexts);
+
+	// averages the partial decryptions and returns the result
+	// encrypted_sum is the result of accumulateCiphertexts() and partial_plaintexts is the result of partiallyDecrypt
+	// of each ciphertext fed into accumulateCiphertexts
+	public static native double[] average(long server, byte[] encrypted_sum, byte[][] partial_plaintexts);
 }

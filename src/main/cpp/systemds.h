@@ -114,6 +114,86 @@ JNIEXPORT jboolean JNICALL Java_org_apache_sysds_utils_NativeHelper_conv2dSparse
 JNIEXPORT void JNICALL Java_org_apache_sysds_utils_NativeHelper_setMaxNumThreads
   (JNIEnv *, jclass, jint);
 
+/*
+ * Class:     org_apache_sysds_utils_NativeHelper
+ * Method:    initClient
+ * Signature: ([B)J
+ */
+JNIEXPORT jlong JNICALL Java_org_apache_sysds_utils_NativeHelper_initClient
+  (JNIEnv *, jclass, jbyteArray);
+
+/*
+ * Class:     org_apache_sysds_utils_NativeHelper
+ * Method:    generatePartialPublicKey
+ * Signature: (J)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_generatePartialPublicKey
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     org_apache_sysds_utils_NativeHelper
+ * Method:    setPublicKey
+ * Signature: (J[B)V
+ */
+JNIEXPORT void JNICALL Java_org_apache_sysds_utils_NativeHelper_setPublicKey
+  (JNIEnv *, jclass, jlong, jbyteArray);
+
+/*
+ * Class:     org_apache_sysds_utils_NativeHelper
+ * Method:    encrypt
+ * Signature: (J[D)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_encrypt
+  (JNIEnv *, jclass, jlong, jdoubleArray);
+
+/*
+ * Class:     org_apache_sysds_utils_NativeHelper
+ * Method:    partiallyDecrypt
+ * Signature: (J[B)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_partiallyDecrypt
+  (JNIEnv *, jclass, jlong, jbyteArray);
+
+/*
+ * Class:     org_apache_sysds_utils_NativeHelper
+ * Method:    initServer
+ * Signature: ()J
+ */
+JNIEXPORT jlong JNICALL Java_org_apache_sysds_utils_NativeHelper_initServer
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     org_apache_sysds_utils_NativeHelper
+ * Method:    generateA
+ * Signature: (J)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_generateA
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     org_apache_sysds_utils_NativeHelper
+ * Method:    aggregatePartialPublicKeys
+ * Signature: (J[[B)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_aggregatePartialPublicKeys
+  (JNIEnv *, jclass, jlong, jobjectArray);
+
+/*
+ * Class:     org_apache_sysds_utils_NativeHelper
+ * Method:    accumulateCiphertexts
+ * Signature: (J[[B)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_accumulateCiphertexts
+  (JNIEnv *, jclass, jlong, jobjectArray);
+
+/*
+ * Class:     org_apache_sysds_utils_NativeHelper
+ * Method:    average
+ * Signature: (J[B[[B)[D
+ */
+JNIEXPORT jdoubleArray JNICALL Java_org_apache_sysds_utils_NativeHelper_average
+  (JNIEnv *, jclass, jlong, jbyteArray, jobjectArray);
+
 #ifdef __cplusplus
 }
 #endif
