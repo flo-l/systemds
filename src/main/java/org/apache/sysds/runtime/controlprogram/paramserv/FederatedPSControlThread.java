@@ -165,7 +165,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 		//_use_homomorphic_encryption = false;
 		if (_use_homomorphic_encryption) {
 			// TODO: generate a here
-			PublicKey a = ((HEParamServer)_ps).generateA();
+			byte[] a = ((HEParamServer)_ps).generateA();
 			// generate pk[i] on each client and return it
 			udfResponse = _featuresData.executeFederatedOperation(
 					new FederatedRequest(RequestType.EXEC_UDF, _featuresData.getVarID(),
@@ -287,11 +287,11 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 	private static class SetupHEFederatedWorker extends SetupFederatedWorker {
 		private static final long serialVersionUID = 9128347291804980123L;
 
-		PublicKey _partial_pubkey_a;
+		byte[] _partial_pubkey_a;
 
         protected SetupHEFederatedWorker(long batchSize, long dataSize, int possibleBatchesPerLocalEpoch,
                                          String programString, String namespace, String gradientsFunctionName, String aggregationFunctionName,
-                                         ListObject hyperParams, long modelVarID, int nbatches, PublicKey partial_pubkey_a) {
+                                         ListObject hyperParams, long modelVarID, int nbatches, byte[] partial_pubkey_a) {
             // delegate everything to parent class. set modelAvg to true, as it is the only supported case
             super(batchSize, dataSize, possibleBatchesPerLocalEpoch, programString, namespace, gradientsFunctionName,
                     aggregationFunctionName, hyperParams, modelVarID, nbatches, true);
@@ -303,9 +303,9 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
         public FederatedResponse execute(ExecutionContext ec, Data... data) {
 			// TODO: set other CKKS parameters
 			// TODO generate partial public key
-			SEALClient sc = new SEALClient();
+			SEALClient sc = new SEALClient(_partial_pubkey_a);
 			ec.setSealClient(sc);
-			PublicKey partial_pubkey = sc.generatePartialPublicKey(_partial_pubkey_a);
+			PublicKey partial_pubkey = sc.generatePartialPublicKey();
 
 			FederatedResponse res = super.execute(ec, data);
 			if (!res.isSuccessful()) {

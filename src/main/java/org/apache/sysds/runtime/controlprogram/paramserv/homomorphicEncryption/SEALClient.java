@@ -3,47 +3,47 @@ package org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption;
 import org.apache.sysds.runtime.controlprogram.caching.MatrixObject;
 import org.apache.sysds.runtime.instructions.cp.CiphertextMatrix;
 import org.apache.sysds.runtime.instructions.cp.PlaintextMatrix;
+import org.apache.sysds.runtime.matrix.data.MatrixBlock;
+import org.apache.sysds.utils.NativeHelper;
+
+import java.util.stream.IntStream;
 
 public class SEALClient {
-    static {
-        System.load("/var/home/me/Dokumente/uni/01_master/masterarbeit/systemds/src/main/java/org/apache/sysds/runtime/controlprogram/paramserv/homomorphicEncryption/cpp/target/libseal_implementation.so");
-    }
-
-    public SEALClient() {
+    public SEALClient(byte[] a) {
         // TODO take params here, like slot_count etc.
         // TODO init ctx and block_size
+        ctx = NativeHelper.initClient(a);
     }
-
-    public int getBlockSize() {
-        return _block_size;
-    }
-    private int _block_size = -1;
-
-    // TODO: use this to init ctx
-    private native void init();
 
     // this is a pointer to the context used by all native methods of this class
-    private long ctx = 0;
+    private final long ctx;
 
-    // NOTICE: all long[] arys here have to be of size SEAL slot_count
-    // they represent the data of one Ciphertext object
-    // NOTICE: all double[] arys here have to be half the size of SEAL slot_count
-    // they represent the data of one Plaintext object
 
     // generates a partial public key and returns it
     // stores a partial private key corresponding to the partial public key in ctx
-    public native PublicKey generatePartialPublicKey(PublicKey a);
+    public PublicKey generatePartialPublicKey() {
+        return new PublicKey(NativeHelper.generatePartialPublicKey(ctx));
+    }
 
     // sets the public key and stores it in ctx
-    public native void setPublicKey(PublicKey public_key);
+    public void setPublicKey(PublicKey public_key) {
+        NativeHelper.setPublicKey(ctx, public_key.getData());
+    }
 
     // encrypts one block of data with public key stored statically and returns it
     // setPublicKey() must have been called before calling this
     // half_block is half the size of SEAL slot_count
-    public native CiphertextMatrix encrypt(MatrixObject plaintext);
+    public CiphertextMatrix encrypt(MatrixObject plaintext) {
+        MatrixBlock mb = plaintext.acquireReadAndRelease();
+        int[] dims = IntStream.range(0, 4).map(mb.getDenseBlock()::getDim).toArray();
+        double[] raw_data = mb.getDenseBlockValues();
+        return new CiphertextMatrix(dims, plaintext.getDataCharacteristics(), NativeHelper.encrypt(ctx, raw_data));
+    }
 
     // partially decrypts one block with the partial private key. generatePartialPublicKey() must
     // have been called before calling this function
     //  returns a block half the size of SEAL slot_count
-    public native PlaintextMatrix partiallyDecrypt(CiphertextMatrix ciphertext);
+    public PlaintextMatrix partiallyDecrypt(CiphertextMatrix ciphertext) {
+        return new PlaintextMatrix(ciphertext.getDims(), ciphertext.getDataCharacteristics(), NativeHelper.partiallyDecrypt(ctx, ciphertext.getData()));
+    }
 }

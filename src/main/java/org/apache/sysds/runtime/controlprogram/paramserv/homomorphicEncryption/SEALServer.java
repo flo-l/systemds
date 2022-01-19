@@ -1,29 +1,27 @@
 package org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption;
 
 import org.apache.sysds.runtime.controlprogram.caching.MatrixObject;
+import org.apache.sysds.runtime.controlprogram.context.ExecutionContext;
+import org.apache.sysds.runtime.data.DenseBlock;
+import org.apache.sysds.runtime.data.DenseBlockFactory;
 import org.apache.sysds.runtime.instructions.cp.CiphertextMatrix;
+import org.apache.sysds.runtime.instructions.cp.Encrypted;
 import org.apache.sysds.runtime.instructions.cp.PlaintextMatrix;
+import org.apache.sysds.runtime.matrix.data.MatrixBlock;
+import org.apache.sysds.runtime.meta.DataCharacteristics;
+import org.apache.sysds.utils.NativeHelper;
+
+import java.nio.DoubleBuffer;
+import java.util.Arrays;
 
 public class SEALServer {
-    static {
-        System.load("/var/home/me/Dokumente/uni/01_master/masterarbeit/systemds/src/main/java/org/apache/sysds/runtime/controlprogram/paramserv/homomorphicEncryption/cpp/target/libseal_implementation.so");
-    }
-
     public SEALServer() {
         // TODO take params here, like slot_count etc.
-        // TODO init ctx and block_size
+        ctx = NativeHelper.initServer();
     }
-
-    public int getBlockSize() {
-        return _block_size;
-    }
-    private int _block_size = -1;
-
-    // TODO: use this to init ctx
-    private native void init();
 
     // this is a pointer to the context used by all native methods of this class
-    private long ctx = 0;
+    private final long ctx;
 
     // NOTICE: all long[] arys here have to be of size SEAL slot_count
     // they represent the data of one Ciphertext object
@@ -31,20 +29,53 @@ public class SEALServer {
     // they represent the data of one Plaintext object
 
     // this generates the a constant. in a future version we want to generate this together with the clients to prevent misuse
-    public native PublicKey generateA();
+    public byte[] generateA() {
+        return NativeHelper.generateA(ctx);
+    }
 
     // accumulates the given partial public keys into a public key, stores it in ctx and returns it
-    public native PublicKey aggregatePartialPublicKeys(PublicKey[] partial_public_keys);
+    public PublicKey aggregatePartialPublicKeys(PublicKey[] partial_public_keys) {
+        return new PublicKey(NativeHelper.aggregatePartialPublicKeys(ctx, extractRawData(partial_public_keys)));
+    }
 
     // accumulates the given ciphertext blocks into a sum ciphertext and returns it
     // stores c0 of the sum to be used in averageBlocks()
-    public native CiphertextMatrix accumulateCiphertexts(CiphertextMatrix[] ciphertexts);
+    public CiphertextMatrix accumulateCiphertexts(CiphertextMatrix[] ciphertexts) {
+        return new CiphertextMatrix(ciphertexts[0].getDims(), ciphertexts[0].getDataCharacteristics(), NativeHelper.accumulateCiphertexts(ctx, extractRawData(ciphertexts)));
+    }
 
-    // averages the partial decryptions, which are all half the size of SEAL slot_count and returns the result as
-    // half_block and
+    // averages the partial decryptions and stores the result in old_mo
     // encrypted_sum is the result of accumulateCiphertexts() and partial_plaintexts is the result of partiallyDecryptBlock
     // of each ciphertext fed into accumulateCiphertexts
-    public native MatrixObject average(CiphertextMatrix encrypted_sum, PlaintextMatrix[] partial_plaintexts);
+    public MatrixObject average(CiphertextMatrix encrypted_sum, PlaintextMatrix[] partial_plaintexts) {
+        double[] raw_result = NativeHelper.average(ctx, encrypted_sum.getData(), extractRawData(partial_plaintexts));
+        int[] dims = encrypted_sum.getDims();
+        int result_len = Arrays.stream(dims).reduce(1, (x,y) -> x*y);
+        DataCharacteristics dc = encrypted_sum.getDataCharacteristics();
+
+        DenseBlock new_dense_block = DenseBlockFactory.createDenseBlock(DoubleBuffer.wrap(raw_result, 0, result_len).array(), dims);
+        MatrixBlock new_matrix_block = new MatrixBlock((int)dc.getRows(), (int)dc.getCols(), new_dense_block);
+        MatrixObject new_obj = ExecutionContext.createMatrixObject(dc);
+        new_obj.acquireModify(new_matrix_block);
+        return new_obj;
+    }
+
+    private static byte[][] extractRawData(Encrypted[] data) {
+        byte[][] raw_data = new byte[data.length][];
+        for (int i = 0; i < data.length; i++) {
+            raw_data[i] = data[i].getData();
+        }
+        return raw_data;
+    }
+
+    // TODO: extract an interface for this and use it here
+    private static byte[][] extractRawData(PublicKey[] data) {
+        byte[][] raw_data = new byte[data.length][];
+        for (int i = 0; i < data.length; i++) {
+            raw_data[i] = data[i].getData();
+        }
+        return raw_data;
+    }
 
     /*
 

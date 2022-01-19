@@ -59,7 +59,7 @@ public class HEParamServer extends LocalParamServer {
         }
     }
 
-    public PublicKey generateA() {
+    public byte[] generateA() {
         return _seal_server.generateA();
     }
 
@@ -102,14 +102,7 @@ public class HEParamServer extends LocalParamServer {
         return result;
     }
 
-    private MatrixObject[] homomorphicAverage(List<PlaintextMatrix[]> partial_decryptions) {
-        // TODO: implement with SEAL
-        //  for partial_decryption model p
-        //      for each matrixObject in p
-        //          for each block of size paramserv::blocksize
-        //              extract data
-        //              call SEAL
-        //              store result
+    private MatrixObject[] homomorphicAverage(CiphertextMatrix[] encrypted_sums, List<PlaintextMatrix[]> partial_decryptions) {
         MatrixObject[] result = new MatrixObject[partial_decryptions.get(0).length];
         for (int matrix_idx = 0; matrix_idx < partial_decryptions.get(0).length; matrix_idx++) {
             PlaintextMatrix[] partial_plaintexts = new PlaintextMatrix[partial_decryptions.size()];
@@ -117,7 +110,7 @@ public class HEParamServer extends LocalParamServer {
                 partial_plaintexts[i] = partial_decryptions.get(i)[matrix_idx];
             }
 
-            result[matrix_idx] = _seal_server.average(null, partial_plaintexts);
+            result[matrix_idx] = _seal_server.average(encrypted_sums[matrix_idx], partial_plaintexts);
         }
         return result;
     }
@@ -130,7 +123,7 @@ public class HEParamServer extends LocalParamServer {
         // get partial decryptions
         PlaintextMatrix[] partial_decryption = _threads.get(workerID).getPartialDecryption(homomorphic_sum);
 
-        MatrixObject[] new_model_matrices = collectAndDo(workerID, partial_decryption, this::homomorphicAverage);
+        MatrixObject[] new_model_matrices = collectAndDo(workerID, partial_decryption, x -> this.homomorphicAverage(homomorphic_sum, x));
 
         ListObject old_model = getResult();
         ListObject new_model = new ListObject(old_model);
