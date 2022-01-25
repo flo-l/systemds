@@ -13,8 +13,8 @@ public abstract class Encrypted extends Data {
     private final DataCharacteristics _dc;
     private final byte[] _data;
 
-    public Encrypted(int[] dims, DataCharacteristics dc, byte[] data) {
-        super(Types.DataType.UNKNOWN, Types.ValueType.UNKNOWN);
+    public Encrypted(int[] dims, DataCharacteristics dc, byte[] data, Types.DataType dt) {
+        super(dt, Types.ValueType.UNKNOWN);
         _dims = dims;
         _dc = dc;
         _data = data;

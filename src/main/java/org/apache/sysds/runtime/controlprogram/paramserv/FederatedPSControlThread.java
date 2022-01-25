@@ -193,9 +193,8 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 			throw new DMLRuntimeException("FederatedLocalPSThread: failed to execute Setup UDF" + e.getMessage());
 		}
 		if (_use_homomorphic_encryption) {
-			PublicKey partial_public_key;
 			try {
-				partial_public_key = (PublicKey) response.getData()[0];
+				_partial_public_key = (PublicKey) response.getData()[0];
 			}
 			catch (Exception e) {
 				throw new DMLRuntimeException("FederatedLocalPSThread: HE Setup UDF didn't return an object");
@@ -433,11 +432,12 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 				int localStartBatchNum = getNextLocalBatchNum(currentLocalBatchNumber++, _possibleBatchesPerLocalEpoch);
 				ListObject model = pullModel();
 				ListObject gradients = computeGradientsForNBatches(model, 1, localStartBatchNum);
-				if (_modelAvg)
+				if (_modelAvg && !_use_homomorphic_encryption)
+					// we can't call the agg fn if we use HE, because it is implemented homomorphically in SEALServer::aggregateCiphertexts
 					model = _ps.updateLocalModel(_ec, gradients, model);
 				else
 					ParamservUtils.cleanupListObject(model);
-				weightAndPushGradients(_modelAvg ? model : gradients);
+				weightAndPushGradients((_modelAvg && !_use_homomorphic_encryption) ? model : gradients);
 				ParamservUtils.cleanupListObject(gradients);
 			}
 		}
@@ -686,7 +686,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 				ListObject model = (ListObject) res.getData()[0];
 				ListObject encrypted_model = new ListObject(model);
 				for (int matrix_idx = 0; matrix_idx < model.getLength(); matrix_idx++) {
-					CiphertextMatrix encrypted_matrix = ec.getSealClient().encrypt((MatrixObject) encrypted_model.getData(matrix_idx));
+					CiphertextMatrix encrypted_matrix = ec.getSealClient().encrypt((MatrixObject) model.getData(matrix_idx));
 					encrypted_model.set(matrix_idx, encrypted_matrix);
 				}
 				// overwrite model with encryption
@@ -734,7 +734,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 
 		try {
 			Object[] responseData = udfResponse.get().getData();
-			return (PlaintextMatrix[]) responseData[0];
+			return (PlaintextMatrix[]) responseData;
 		} catch(Exception e) {
 			throw new DMLRuntimeException("FederatedLocalPSThread: failed to execute UDF" + e.getMessage());
 		}

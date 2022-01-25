@@ -365,7 +365,7 @@ public abstract class ParamServer
 		}
 	}
 
-	protected  ListObject weightModels(ListObject params, int numWorkers) {
+	protected ListObject weightModels(ListObject params, int numWorkers) {
 		double _averagingFactor = 1d / numWorkers;
 
 		if( _averagingFactor != 1) {

@@ -276,6 +276,12 @@ jbyteArray allocate_byte_array(JNIEnv* env, ostringstream& stream) {
     return ret;
 }
 
+void my_assert(bool assertion, const char* message = "Assertion failed") {
+    if (!assertion) {
+        throw logic_error(message);
+    }
+}
+
 template<typename T> jbyteArray serialize(JNIEnv* env, T& object) {
     ostringstream ss;
     object.save(ss);
@@ -325,7 +331,7 @@ JNIEXPORT jlong JNICALL Java_org_apache_sysds_utils_NativeHelper_initClient
 
     // copy a to global state
     size_t byte_size = env->GetArrayLength(a_ary);
-    assert(byte_size % sizeof(uint64_t) == 0);
+    my_assert(byte_size % sizeof(uint64_t) == 0);
     size_t size = byte_size / sizeof(uint64_t);
     uint64_t* a = reinterpret_cast<uint64_t*>(env->GetByteArrayElements(a_ary, NULL));
     gsl::span<uint64_t > new_a(a, size);
@@ -343,7 +349,7 @@ JNIEXPORT jlong JNICALL Java_org_apache_sysds_utils_NativeHelper_initClient
 
 
 JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_generatePartialPublicKey
-  (JNIEnv* env, jclass, jlong client_ptr, jbyteArray) {
+  (JNIEnv* env, jclass, jlong client_ptr) {
     Client* client = reinterpret_cast<Client*>(client_ptr);
     return serialize(env, client->partial_public_key().data());
 }
@@ -365,9 +371,12 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_encrypt
 
     std::ostringstream ss;
     // write chunk size
-    serialize_uint32_t(ss, num_data / slot_count);
-    for (size_t offset = 0; offset < num_data; offset += slot_count) {
-        gsl::span<const double> data_span(&data[offset], min(slot_count, num_data-offset));
+    uint32_t num_chunks = (num_data - 1) / slot_count + 1;
+    serialize_uint32_t(ss, num_chunks);
+    for (size_t i = 0; i < num_chunks; i++) {
+        size_t offset = slot_count * i;
+        size_t length = min(slot_count, num_data-offset);
+        gsl::span<const double> data_span(&data[offset], length);
         Ciphertext encrypted_chunk = client->encrypted_data(data_span);
         encrypted_chunk.save(ss);
     }
@@ -379,18 +388,20 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_partiallyD
   (JNIEnv* env, jclass, jlong client_ptr, jbyteArray serialized_ciphertexts) {
     Client* client = reinterpret_cast<Client*>(client_ptr);
     auto input = get_stream(env, serialized_ciphertexts);
-    ostringstream result;
+    std::ostringstream ss;
 
     // read num of chunks
     uint32_t num_chunks = deserialize_uint32_t(*input);
 
+    // write chunk size
+    serialize_uint32_t(ss, num_chunks);
     for (int i = 0; i < num_chunks; i++) {
         Ciphertext ciphertext = deserialize_ciphertext(*input, client->context());
         Plaintext plaintext = client->partial_decryption(ciphertext);
-        serialize_plaintext(result, plaintext);
+        plaintext.save(ss);
     }
 
-    return allocate_byte_array(env, result);
+    return allocate_byte_array(env, ss);
 }
 
 
@@ -434,7 +445,6 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_aggregateP
 JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_accumulateCiphertexts
   (JNIEnv* env, jclass, jlong server_ptr, jobjectArray ciphertexts_serialized) {
     Server* server = reinterpret_cast<Server*>(server_ptr);
-    size_t slot_size = get_slot_count(server->context());
     size_t num_ciphertext_arys = env->GetArrayLength(ciphertexts_serialized);
 
     // init streams
@@ -449,7 +459,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_accumulate
     // read lengths of ciphertext arys and check that they are all the same
     uint32_t num_slots = deserialize_uint32_t(*buf[0]);
     for (int i = 1; i < num_ciphertext_arys; i++) {
-        assert(deserialize_uint32_t(*buf[i]) == num_slots);
+        my_assert(deserialize_uint32_t(*buf[i]) == num_slots);
     }
 
     // read ciphertexts in chunks and accumulate them
@@ -489,11 +499,11 @@ JNIEXPORT jdoubleArray JNICALL Java_org_apache_sysds_utils_NativeHelper_average
     // read lengths of ciphertext arys and check that they are all the same
     uint32_t num_slots = deserialize_uint32_t(*buf[0]);
     for (int i = 1; i < num_plaintext_arys; i++) {
-        assert(deserialize_uint32_t(*buf[i]) == num_slots);
+        my_assert(deserialize_uint32_t(*buf[i]) == num_slots, "number of plaintext slots is different");
     }
 
     auto encrypted_sum_stream = get_stream(env, ciphertext_sum_serialized);
-    assert(deserialize_uint32_t(*encrypted_sum_stream) == num_slots);
+    my_assert(deserialize_uint32_t(*encrypted_sum_stream) == num_slots, "number of ciphertext slots is different");
 
     // read ciphertexts in chunks and accumulate them
     jdoubleArray result = env->NewDoubleArray(num_slots * slot_size);

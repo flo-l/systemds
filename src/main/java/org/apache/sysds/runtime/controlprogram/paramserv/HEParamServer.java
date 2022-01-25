@@ -20,7 +20,7 @@ public class HEParamServer extends LocalParamServer {
     private int _thread_counter = 0;
     private final List<FederatedPSControlThread> _threads;
     private final List<Object> _result_buffer; // one per thread
-    private Object result;
+    private Object _result;
     private final SEALServer _seal_server;
 
     public static HEParamServer create(ListObject model, String aggFunc, Statement.PSUpdateType updateType,
@@ -75,7 +75,7 @@ public class HEParamServer extends LocalParamServer {
 
         if (_thread_counter == getNumWorkers()) {
             List<T> buf = _result_buffer.stream().map(x -> (T)x).collect(Collectors.toList());
-            result = f.apply(buf);
+            _result = f.apply(buf);
             resetResultBuffer();
             _thread_counter = 0;
             notifyAll();
@@ -87,7 +87,7 @@ public class HEParamServer extends LocalParamServer {
             }
         }
 
-        return (U)result;
+        return (U) _result;
     }
 
     private CiphertextMatrix[] homomorphicAggregation(List<ListObject> encrypted_models) {

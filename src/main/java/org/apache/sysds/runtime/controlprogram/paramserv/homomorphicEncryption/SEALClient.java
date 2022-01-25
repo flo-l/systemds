@@ -1,6 +1,8 @@
 package org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption;
 
 import org.apache.sysds.runtime.controlprogram.caching.MatrixObject;
+import org.apache.sysds.runtime.data.DenseBlock;
+import org.apache.sysds.runtime.data.DenseBlockFactory;
 import org.apache.sysds.runtime.instructions.cp.CiphertextMatrix;
 import org.apache.sysds.runtime.instructions.cp.PlaintextMatrix;
 import org.apache.sysds.runtime.matrix.data.MatrixBlock;
@@ -35,7 +37,12 @@ public class SEALClient {
     // half_block is half the size of SEAL slot_count
     public CiphertextMatrix encrypt(MatrixObject plaintext) {
         MatrixBlock mb = plaintext.acquireReadAndRelease();
-        int[] dims = IntStream.range(0, 4).map(mb.getDenseBlock()::getDim).toArray();
+        if (mb.isInSparseFormat()) {
+            mb.allocateSparseRowsBlock();
+            mb.sparseToDense();
+        }
+        DenseBlock db = mb.getDenseBlock();
+        int[] dims = IntStream.range(0, db.numDims()).map(db::getDim).toArray();
         double[] raw_data = mb.getDenseBlockValues();
         return new CiphertextMatrix(dims, plaintext.getDataCharacteristics(), NativeHelper.encrypt(ctx, raw_data));
     }

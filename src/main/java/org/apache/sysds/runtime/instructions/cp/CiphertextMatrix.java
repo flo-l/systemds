@@ -1,5 +1,6 @@
 package org.apache.sysds.runtime.instructions.cp;
 
+import org.apache.sysds.common.Types;
 import org.apache.sysds.runtime.meta.DataCharacteristics;
 
 /**
@@ -9,7 +10,7 @@ public class CiphertextMatrix extends Encrypted {
     private static final long serialVersionUID = 1762936872261940616L;
 
     public CiphertextMatrix(int[] dims, DataCharacteristics dc, byte[] data) {
-        super(dims, dc, data);
+        super(dims, dc, data, Types.DataType.ENCRYPTED_CIPHER);
     }
 
     @Override

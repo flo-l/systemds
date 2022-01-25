@@ -25,10 +25,12 @@ import java.util.Collection;
 import java.util.List;
 
 import org.apache.sysds.common.Types.ExecMode;
+import org.apache.sysds.hops.codegen.SpoofCompiler;
 import org.apache.sysds.runtime.privacy.PrivacyConstraint;
 import org.apache.sysds.test.AutomatedTestBase;
 import org.apache.sysds.test.TestConfiguration;
 import org.apache.sysds.test.TestUtils;
+import org.apache.sysds.utils.NativeHelper;
 import org.apache.sysds.utils.Statistics;
 import org.junit.Assert;
 import org.junit.Test;
@@ -66,9 +68,9 @@ public class EncryptedFederatedParamservTest extends AutomatedTestBase {
 				//{"TwoNN",	4, 60000, 32, 4, 0.01, 	"BSP", "BATCH", "KEEP_DATA_ON_WORKER", 	"NONE" ,		"false","BALANCED",		200},
 
 				// One important point is that we do the model averaging in the case of BSP
-				{"TwoNN",	2, 4, 1, 4, 0.01, 		"BSP", "BATCH", "KEEP_DATA_ON_WORKER", 	"BASELINE",		"true",	"IMBALANCED",	200},
-				{"CNN", 	2, 4, 1, 4, 0.01, 		"BSP", "EPOCH", "SHUFFLE", 				"BASELINE",		"true",	"IMBALANCED", 	200},
-				{"TwoNN", 	5, 1000, 100, 2, 0.01, 	"BSP", "BATCH", "KEEP_DATA_ON_WORKER", 	"NONE",			"true",	"BALANCED",		200},
+				{"TwoNN",	2, 4, 1, 1, 0.01, 		"BSP", "BATCH", "KEEP_DATA_ON_WORKER", 	"BASELINE",		"true",	"IMBALANCED",	200},
+				{"CNN", 	2, 4, 1, 1, 0.01, 		"BSP", "EPOCH", "KEEP_DATA_ON_WORKER",  "BASELINE",		"true",	"IMBALANCED", 	200},
+				//{"TwoNN", 	5, 1000, 100, 1, 0.01, 	"BSP", "BATCH", "KEEP_DATA_ON_WORKER", 	"NONE",			"true",	"BALANCED",		200},
 
 				/*
                     // runtime balancing
@@ -93,7 +95,11 @@ public class EncryptedFederatedParamservTest extends AutomatedTestBase {
 
 	public EncryptedFederatedParamservTest(String networkType, int numFederatedWorkers, int dataSetSize, int batch_size,
 										  int epochs, double eta, String utype, String freq, String scheme, String runtime_balancing, String weighting, String data_distribution, int seed) {
-
+		try {
+			NativeHelper.initialize("none", "openblas");
+		} catch (Exception e) {
+			throw e;
+		}
 		_networkType = networkType;
 		_numFederatedWorkers = numFederatedWorkers;
 		_dataSetSize = dataSetSize;

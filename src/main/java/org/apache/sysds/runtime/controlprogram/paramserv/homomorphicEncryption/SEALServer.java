@@ -1,5 +1,8 @@
 package org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption;
 
+import org.apache.sysds.common.Types;
+import org.apache.sysds.conf.ConfigurationManager;
+import org.apache.sysds.hops.OptimizerUtils;
 import org.apache.sysds.runtime.controlprogram.caching.MatrixObject;
 import org.apache.sysds.runtime.controlprogram.context.ExecutionContext;
 import org.apache.sysds.runtime.data.DenseBlock;
@@ -9,6 +12,8 @@ import org.apache.sysds.runtime.instructions.cp.Encrypted;
 import org.apache.sysds.runtime.instructions.cp.PlaintextMatrix;
 import org.apache.sysds.runtime.matrix.data.MatrixBlock;
 import org.apache.sysds.runtime.meta.DataCharacteristics;
+import org.apache.sysds.runtime.meta.MatrixCharacteristics;
+import org.apache.sysds.runtime.meta.MetaDataFormat;
 import org.apache.sysds.utils.NativeHelper;
 
 import java.nio.DoubleBuffer;
@@ -22,6 +27,7 @@ public class SEALServer {
 
     // this is a pointer to the context used by all native methods of this class
     private final long ctx;
+    private byte[] _a;
 
     // NOTICE: all long[] arys here have to be of size SEAL slot_count
     // they represent the data of one Ciphertext object
@@ -29,8 +35,11 @@ public class SEALServer {
     // they represent the data of one Plaintext object
 
     // this generates the a constant. in a future version we want to generate this together with the clients to prevent misuse
-    public byte[] generateA() {
-        return NativeHelper.generateA(ctx);
+    public synchronized byte[] generateA() {
+        if (_a == null) {
+            _a = NativeHelper.generateA(ctx);
+        }
+        return _a;
     }
 
     // accumulates the given partial public keys into a public key, stores it in ctx and returns it
@@ -55,9 +64,9 @@ public class SEALServer {
 
         DenseBlock new_dense_block = DenseBlockFactory.createDenseBlock(DoubleBuffer.wrap(raw_result, 0, result_len).array(), dims);
         MatrixBlock new_matrix_block = new MatrixBlock((int)dc.getRows(), (int)dc.getCols(), new_dense_block);
-        MatrixObject new_obj = ExecutionContext.createMatrixObject(dc);
-        new_obj.acquireModify(new_matrix_block);
-        return new_obj;
+        MatrixObject new_mo = new MatrixObject(Types.ValueType.FP64, OptimizerUtils.getUniqueTempFileName(), new MetaDataFormat(dc, Types.FileFormat.BINARY), new_matrix_block);
+        new_mo.exportData(); // write data, otherwise it might get evicted and thus get lost
+        return new_mo;
     }
 
     private static byte[][] extractRawData(Encrypted[] data) {
