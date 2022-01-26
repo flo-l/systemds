@@ -102,7 +102,7 @@ public class HEParamServer extends LocalParamServer {
         return result;
     }
 
-    private MatrixObject[] homomorphicAverage(CiphertextMatrix[] encrypted_sums, List<PlaintextMatrix[]> partial_decryptions) {
+    private Void homomorphicAverage(CiphertextMatrix[] encrypted_sums, List<PlaintextMatrix[]> partial_decryptions) {
         MatrixObject[] result = new MatrixObject[partial_decryptions.get(0).length];
         for (int matrix_idx = 0; matrix_idx < partial_decryptions.get(0).length; matrix_idx++) {
             PlaintextMatrix[] partial_plaintexts = new PlaintextMatrix[partial_decryptions.size()];
@@ -112,7 +112,14 @@ public class HEParamServer extends LocalParamServer {
 
             result[matrix_idx] = _seal_server.average(encrypted_sums[matrix_idx], partial_plaintexts);
         }
-        return result;
+
+        ListObject old_model = getResult();
+        ListObject new_model = new ListObject(old_model);
+        for (int i = 0; i < new_model.getLength(); i++) {
+            new_model.set(i, result[i]);
+        }
+        updateAndBroadcastModel(new_model, null);
+        return null;
     }
 
     @Override
@@ -123,15 +130,7 @@ public class HEParamServer extends LocalParamServer {
         // get partial decryptions
         PlaintextMatrix[] partial_decryption = _threads.get(workerID).getPartialDecryption(homomorphic_sum);
 
-        MatrixObject[] new_model_matrices = collectAndDo(workerID, partial_decryption, x -> this.homomorphicAverage(homomorphic_sum, x));
-
-        ListObject old_model = getResult();
-        ListObject new_model = new ListObject(old_model);
-        for (int i = 0; i < new_model.getLength(); i++) {
-            new_model.set(i, new_model_matrices[i]);
-        }
-
-        // FIXME: this is called with the same data from every thread. we could also just call it once and skip the averaging step. anyhow, this is easier to implement for the POC.
-        updateGlobalModel(workerID, new_model);
+        // do average and update global model
+        collectAndDo(workerID, partial_decryption, x -> this.homomorphicAverage(homomorphic_sum, x));
     }
 }
