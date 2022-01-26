@@ -24,8 +24,8 @@ public class InOutTest extends AutomatedTestBase {
 
     private final int num_clients = 3;
 
-    private final int rows = 8192;
-    private final int cols = 1;
+    private final int rows = 100;
+    private final int cols = 200;
     private final long seed = 42;
 
     @Override
@@ -90,6 +90,9 @@ public class InOutTest extends AutomatedTestBase {
         }
 
         double[] raw_result = result.acquireReadAndRelease().getDenseBlockValues();
+        assert result.getNumRows() == rows;
+        assert result.getNumColumns() == cols;
+        assert raw_result.length == rows*cols;
         TestUtils.compareMatrices(raw_result, expected_raw_result, 1e-8);
     }
 }

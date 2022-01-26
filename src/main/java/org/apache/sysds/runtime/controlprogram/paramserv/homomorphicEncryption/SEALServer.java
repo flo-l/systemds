@@ -62,7 +62,7 @@ public class SEALServer {
         int result_len = Arrays.stream(dims).reduce(1, (x,y) -> x*y);
         DataCharacteristics dc = encrypted_sum.getDataCharacteristics();
 
-        DenseBlock new_dense_block = DenseBlockFactory.createDenseBlock(DoubleBuffer.wrap(raw_result, 0, result_len).array(), dims);
+        DenseBlock new_dense_block = DenseBlockFactory.createDenseBlock(Arrays.copyOf(raw_result, result_len), dims);
         MatrixBlock new_matrix_block = new MatrixBlock((int)dc.getRows(), (int)dc.getCols(), new_dense_block);
         MatrixObject new_mo = new MatrixObject(Types.ValueType.FP64, OptimizerUtils.getUniqueTempFileName(), new MetaDataFormat(dc, Types.FileFormat.BINARY), new_matrix_block);
         new_mo.exportData(); // write data, otherwise it might get evicted and thus get lost
