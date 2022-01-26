@@ -46,7 +46,7 @@ import org.apache.sysds.runtime.instructions.cp.FunctionCallCPInstruction;
 import org.apache.sysds.runtime.instructions.cp.ListObject;
 import org.apache.sysds.runtime.matrix.data.MatrixBlock;
 import org.apache.sysds.runtime.matrix.operators.RightScalarOperator;
-import org.apache.sysds.utils.Statistics;
+import org.apache.sysds.utils.stats.ParamServStatistics;
 
 public abstract class ParamServer
 {
@@ -278,7 +278,7 @@ public abstract class ParamServer
 		Timing tAgg = DMLScript.STATISTICS ? new Timing(true) : null;
 		_model = updateLocalModel(_ec, gradients, _model);
 		if (DMLScript.STATISTICS && tAgg != null)
-			Statistics.accPSAggregationTime((long) tAgg.stop());
+			ParamServStatistics.accAggregationTime((long) tAgg.stop());
 	}
 
 	/**
@@ -343,12 +343,14 @@ public abstract class ParamServer
 	protected void updateAndBroadcastModel(ListObject new_model, Timing tAgg) {
 		_model = setParams(_ec, new_model, _model);
 		if (DMLScript.STATISTICS && tAgg != null)
-			Statistics.accPSAggregationTime((long) tAgg.stop());
+			ParamServStatistics.accAggregationTime((long) tAgg.stop());
+		_accModels = null; //reset for next accumulation
 
 		// This if has grown to be quite complex its function is rather simple. Validate at the end of each epoch
 		// In the BSP batch case that occurs after the sync counter reaches the number of batches and in the
 		// BSP epoch case every time
 		if(_numBatchesPerEpoch != -1 && (_freq == Statement.PSFrequency.EPOCH || (_freq == Statement.PSFrequency.BATCH && ++_syncCounter % _numBatchesPerEpoch == 0))) {
+
 			if(LOG.isInfoEnabled())
 				LOG.info("[+] PARAMSERV: completed EPOCH " + _epochCounter);
 			time_epoch();
@@ -424,7 +426,7 @@ public abstract class ParamServer
 		//broadcast copy of model to specific worker, cleaned up by worker
 		_modelMap.get(workerID).put(ParamservUtils.copyList(_model, false));
 		if (DMLScript.STATISTICS && tBroad != null)
-			Statistics.accPSModelBroadcastTime((long) tBroad.stop());
+			ParamServStatistics.accModelBroadcastTime((long) tBroad.stop());
 	}
 
 	/**
@@ -433,9 +435,9 @@ public abstract class ParamServer
 	private void time_epoch() {
 		if (DMLScript.STATISTICS) {
 			//TODO double check correctness with multiple, potentially concurrent paramserv invocation
-			Statistics.accPSExecutionTime((long) Statistics.getPSExecutionTimer().stop());
-			double current_total_execution_time = Statistics.getPSExecutionTime();
-			double current_total_validation_time = Statistics.getPSValidationTime();
+			ParamServStatistics.accExecutionTime((long) ParamServStatistics.getExecutionTimer().stop());
+			double current_total_execution_time = ParamServStatistics.getExecutionTime();
+			double current_total_validation_time = ParamServStatistics.getValidationTime();
 			double time_to_epoch = current_total_execution_time - current_total_validation_time;
 
 			if (LOG.isInfoEnabled())
@@ -468,7 +470,7 @@ public abstract class ParamServer
 			LOG.info("[+] PARAMSERV: validation-loss: " + loss + " validation-accuracy: " + accuracy);
 
 		if(tValidate != null)
-			Statistics.accPSValidationTime((long) tValidate.stop());
+			ParamServStatistics.accValidationTime((long) tValidate.stop());
 	}
 
 	public int getNumWorkers() {

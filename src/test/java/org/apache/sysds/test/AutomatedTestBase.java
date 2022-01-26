@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -140,7 +141,7 @@ public abstract class AutomatedTestBase {
 	private static final String DEBUG_TEMP_DIR = "./tmp/";
 
 	/** Directory under which config files shared across tests are located. */
-	private static final String CONFIG_DIR = "./src/test/config/";
+	protected static final String CONFIG_DIR = "./src/test/config/";
 
 	/**
 	 * Location of the SystemDS config file that we use as a template when generating the configs for each test case.
@@ -1095,18 +1096,19 @@ public abstract class AutomatedTestBase {
 
 			curLocalTempDir.mkdirs();
 			TestUtils.clearDirectory(curLocalTempDir.getPath());
-
-			// Create a SystemDS config file for this test case based on default template
-			// from src/test/config or derive from custom configuration provided by test.
-			String configTemplate = FileUtils.readFileToString(getConfigTemplateFile(), "UTF-8");
-			String localTemp = curLocalTempDir.getPath();
-			String configContents = configTemplate
-				.replace(createXMLElement(DMLConfig.SCRATCH_SPACE, "scratch_space"),
-					createXMLElement(DMLConfig.SCRATCH_SPACE, localTemp + "/target/scratch_space"))
-				.replace(createXMLElement(DMLConfig.LOCAL_TMP_DIR, "/tmp/systemds"),
-					createXMLElement(DMLConfig.LOCAL_TMP_DIR, localTemp + "/localtmp"));
-
+			
 			if(!disableConfigFile){
+				// Create a SystemDS config file for this test case based on default template
+				// from src/test/config or derive from custom configuration provided by test.
+				String configTemplate = FileUtils.readFileToString(getConfigTemplateFile(), "UTF-8");
+				String localTemp = curLocalTempDir.getPath();
+				String testScratchSpace = "\n   "+ createXMLElement(DMLConfig.SCRATCH_SPACE, localTemp + "/target/scratch_space") + "\n   ";
+				String testTempSpace = createXMLElement(DMLConfig.LOCAL_TMP_DIR, localTemp + "/localtmp");
+				String configContents = configTemplate
+					// if the config had a tmp location remove it
+					.replace(createXMLElement(DMLConfig.SCRATCH_SPACE, "scratch_space"),"")
+					.replace(createXMLElement(DMLConfig.LOCAL_TMP_DIR, "/tmp/systemds"),"")
+					.replace("</root>", testScratchSpace + testTempSpace + "\n</root>");
 
 				FileUtils.write(getCurConfigFile(), configContents, "UTF-8");
 
@@ -1203,7 +1205,7 @@ public abstract class AutomatedTestBase {
 			// if R < 4.0 on Windows is used, the file separator needs to be Windows style
 			if(System.getProperty("os.name").contains("Windows")) {
 				Process r_ver_cmd = Runtime.getRuntime().exec("RScript --version");
-				String r_ver = IOUtils.toString(r_ver_cmd.getErrorStream());
+				String r_ver = IOUtils.toString(r_ver_cmd.getErrorStream(), Charset.defaultCharset());
 				if(!r_ver.contains("4.0")) {
 					cmd = cmd.replace('/', '\\');
 					executionFile = executionFile.replace('/', '\\');
@@ -1217,8 +1219,8 @@ public abstract class AutomatedTestBase {
 			}
 			Process child = Runtime.getRuntime().exec(cmd);
 
-			outputR = IOUtils.toString(child.getInputStream());
-			errorString = IOUtils.toString(child.getErrorStream());
+			outputR = IOUtils.toString(child.getInputStream(), Charset.defaultCharset());
+			errorString = IOUtils.toString(child.getErrorStream(), Charset.defaultCharset());
 			
 			//
 			// To give any stream enough time to print all data, otherwise there
@@ -1528,8 +1530,10 @@ public abstract class AutomatedTestBase {
 
 		if(TEST_GPU)
 			args.add("-gpu");
-		if(VERBOSE_STATS)
+		if(VERBOSE_STATS) {
 			args.add("-stats");
+			args.add("100");
+		}
 	}
 
 	public static int getRandomAvailablePort() {

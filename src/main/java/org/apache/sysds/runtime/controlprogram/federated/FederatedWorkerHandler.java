@@ -21,6 +21,8 @@ package org.apache.sysds.runtime.controlprogram.federated;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.Arrays;
 
 import io.netty.channel.ChannelFuture;
@@ -43,9 +45,11 @@ import org.apache.sysds.runtime.controlprogram.caching.CacheableData;
 import org.apache.sysds.runtime.controlprogram.caching.FrameObject;
 import org.apache.sysds.runtime.controlprogram.caching.MatrixObject;
 import org.apache.sysds.runtime.controlprogram.context.ExecutionContext;
+import org.apache.sysds.runtime.controlprogram.context.SparkExecutionContext;
 import org.apache.sysds.runtime.controlprogram.federated.FederatedRequest.RequestType;
 import org.apache.sysds.runtime.controlprogram.federated.FederatedResponse.ResponseType;
 import org.apache.sysds.runtime.instructions.Instruction;
+import org.apache.sysds.runtime.instructions.Instruction.IType;
 import org.apache.sysds.runtime.instructions.InstructionParser;
 import org.apache.sysds.runtime.instructions.cp.Data;
 import org.apache.sysds.runtime.instructions.cp.ListObject;
@@ -71,7 +75,8 @@ import org.apache.sysds.utils.Statistics;
 public class FederatedWorkerHandler extends ChannelInboundHandlerAdapter {
 	private static final Logger LOG = Logger.getLogger(FederatedWorkerHandler.class);
 
-	private final ExecutionContextMap _ecm;
+	private final FederatedLookupTable _flt;
+	private final FederatedReadCache _frc;
 
 	/**
 	 * Create a Federated Worker Handler.
@@ -79,24 +84,48 @@ public class FederatedWorkerHandler extends ChannelInboundHandlerAdapter {
 	 * Note: federated worker handler created for every command; and concurrent parfor threads at coordinator need
 	 * separate execution contexts at the federated sites too
 	 * 
-	 * @param ecm A execution context, used to map variables and execution.
+	 * @param flt The Federated Lookup Table of the current Federated Worker.
+	 * @param frc read cache shared by all worker handlers
 	 */
-	public FederatedWorkerHandler(ExecutionContextMap ecm) {
-		_ecm = ecm;
+	public FederatedWorkerHandler(FederatedLookupTable flt, FederatedReadCache frc) {
+		_flt = flt;
+		_frc = frc;
 	}
 
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) {
-		ctx.writeAndFlush(createResponse(msg)).addListener(new CloseListener());
+		ctx.writeAndFlush(createResponse(msg, ctx.channel().remoteAddress()))
+			.addListener(new CloseListener());
 	}
 
 	protected FederatedResponse createResponse(Object msg) {
+		return createResponse(msg, FederatedLookupTable.NOHOST);
+	}
+
+	private FederatedResponse createResponse(Object msg, SocketAddress remoteAddress) {
+		String host;
+		if(remoteAddress instanceof InetSocketAddress) {
+			host = ((InetSocketAddress) remoteAddress).getHostString();
+		}
+		else if(remoteAddress instanceof SocketAddress) {
+			host = remoteAddress.toString().split(":")[0].split("/")[1];
+		}
+		else {
+			LOG.warn("Given remote address of coordinator is null. Continuing with "
+				+ FederatedLookupTable.NOHOST + " as host identifier.");
+			host = FederatedLookupTable.NOHOST;
+		}
+
+		return createResponse(msg, host);
+	}
+
+	private FederatedResponse createResponse(Object msg, String remoteHost) {
 		if(!(msg instanceof FederatedRequest[]))
 			return new FederatedResponse(ResponseType.ERROR,
 				new FederatedWorkerHandlerException("Received object of wrong instance 'FederatedRequest[]'."));
 		final FederatedRequest[] requests = (FederatedRequest[]) msg;
 		try {
-			return createResponse(requests);
+			return createResponse(requests, remoteHost);
 		}
 		catch(DMLPrivacyException | FederatedWorkerHandlerException ex) {
 			// Here we control the error message, therefore it is allowed to send the stack trace with the response
@@ -110,20 +139,21 @@ public class FederatedWorkerHandler extends ChannelInboundHandlerAdapter {
 		}
 	}
 
-	private FederatedResponse createResponse(FederatedRequest[] requests)
+	private FederatedResponse createResponse(FederatedRequest[] requests, String remoteHost)
 		throws DMLPrivacyException, FederatedWorkerHandlerException, Exception {
 		FederatedResponse response = null; // last response
 		boolean containsCLEAR = false;
 		for(int i = 0; i < requests.length; i++) {
 			final FederatedRequest request = requests[i];
 			final RequestType t = request.getType();
+			ExecutionContextMap ecm = _flt.getECM(remoteHost, request.getPID());
 			logRequests(request, i, requests.length);
 
 			PrivacyMonitor.setCheckPrivacy(request.checkPrivacy());
 			PrivacyMonitor.clearCheckedConstraints();
 
 			// execute command and handle privacy constraints
-			final FederatedResponse tmp = executeCommand(request);
+			final FederatedResponse tmp = executeCommand(request, ecm);
 			conditionalAddCheckedConstraints(request, tmp);
 
 			// select the response
@@ -174,22 +204,22 @@ public class FederatedWorkerHandler extends ChannelInboundHandlerAdapter {
 			response.setCheckedConstraints(PrivacyMonitor.getCheckedConstraints());
 	}
 
-	private FederatedResponse executeCommand(FederatedRequest request)
+	private FederatedResponse executeCommand(FederatedRequest request, ExecutionContextMap ecm)
 		throws DMLPrivacyException, FederatedWorkerHandlerException, Exception {
 		final RequestType method = request.getType();
 		switch(method) {
 			case READ_VAR:
-				return readData(request); // matrix/frame
+				return readData(request, ecm); // matrix/frame
 			case PUT_VAR:
-				return putVariable(request);
+				return putVariable(request, ecm);
 			case GET_VAR:
-				return getVariable(request);
+				return getVariable(request, ecm);
 			case EXEC_INST:
-				return execInstruction(request);
+				return execInstruction(request, ecm);
 			case EXEC_UDF:
-				return execUDF(request);
+				return execUDF(request, ecm);
 			case CLEAR:
-				return execClear();
+				return execClear(ecm);
 			case NOOP:
 				return execNoop();
 			default:
@@ -198,71 +228,90 @@ public class FederatedWorkerHandler extends ChannelInboundHandlerAdapter {
 		}
 	}
 
-	private FederatedResponse readData(FederatedRequest request) {
+	private FederatedResponse readData(FederatedRequest request, ExecutionContextMap ecm) {
 		checkNumParams(request.getNumParams(), 2);
 		String filename = (String) request.getParam(0);
 		DataType dt = DataType.valueOf((String) request.getParam(1));
-		return readData(filename, dt, request.getID(), request.getTID());
+		return readData(filename, dt, request.getID(), request.getTID(), ecm);
 	}
 
-	private FederatedResponse readData(String filename, Types.DataType dataType, long id, long tid) {
+	private FederatedResponse readData(String filename, DataType dataType,
+		long id, long tid, ExecutionContextMap ecm) {
 		MatrixCharacteristics mc = new MatrixCharacteristics();
 		mc.setBlocksize(ConfigurationManager.getBlocksize());
-		CacheableData<?> cd;
-		switch(dataType) {
-			case MATRIX:
-				cd = new MatrixObject(Types.ValueType.FP64, filename);
-				break;
-			case FRAME:
-				cd = new FrameObject(filename);
-				break;
-			default:
-				throw new FederatedWorkerHandlerException("Could not recognize datatype");
-		}
 
-		FileFormat fmt = null;
-		boolean header = false;
-		String delim = null;
-		FileSystem fs = null;
-		MetaDataAll mtd;
+		if(dataType != DataType.MATRIX && dataType != DataType.FRAME)
+			// early throwing of exception to avoid infinitely waiting threads for data
+			throw new FederatedWorkerHandlerException("Could not recognize datatype");
 
-		try {
-			final String mtdName = DataExpression.getMTDFileName(filename);
-			Path path = new Path(mtdName);
-			fs = IOUtilFunctions.getFileSystem(mtdName);
-			try(BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(path)))) {
-				mtd = new MetaDataAll(br);
-				if(!mtd.mtdExists())
-					throw new FederatedWorkerHandlerException("Could not parse metadata file");
-				mc.setRows(mtd.getDim1());
-				mc.setCols(mtd.getDim2());
-				mc.setNonZeros(mtd.getNnz());
-				header = mtd.getHasHeader();
-				cd = mtd.parseAndSetPrivacyConstraint(cd);
-				fmt = mtd.getFileFormat();
-				delim = mtd.getDelim();
+		CacheableData<?> cd = _frc.get(filename);
+		if(cd == null) {
+			try {
+				switch(dataType) {
+					case MATRIX:
+						cd = new MatrixObject(Types.ValueType.FP64, filename);
+						break;
+					case FRAME:
+						cd = new FrameObject(filename);
+						break;
+					default:
+						throw new FederatedWorkerHandlerException("Could not recognize datatype");
+				}
+
+				FileFormat fmt = null;
+				boolean header = false;
+				String delim = null;
+				FileSystem fs = null;
+				MetaDataAll mtd;
+
+				try {
+					final String mtdName = DataExpression.getMTDFileName(filename);
+					Path path = new Path(mtdName);
+					fs = IOUtilFunctions.getFileSystem(mtdName);
+					try(BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(path)))) {
+						mtd = new MetaDataAll(br);
+						if(!mtd.mtdExists())
+							throw new FederatedWorkerHandlerException("Could not parse metadata file");
+						mc.setRows(mtd.getDim1());
+						mc.setCols(mtd.getDim2());
+						mc.setNonZeros(mtd.getNnz());
+						header = mtd.getHasHeader();
+						cd = mtd.parseAndSetPrivacyConstraint(cd);
+						fmt = mtd.getFileFormat();
+						delim = mtd.getDelim();
+					}
+				}
+				catch(DMLPrivacyException | FederatedWorkerHandlerException ex) {
+					throw ex;
+				}
+				catch(Exception ex) {
+					String msg = "Exception of type " + ex.getClass() + " thrown when processing READ request";
+					LOG.error(msg, ex);
+					throw new DMLRuntimeException(msg);
+				}
+				finally {
+					IOUtilFunctions.closeSilently(fs);
+				}
+
+				// put meta data object in symbol table, read on first operation
+				cd.setMetaData(new MetaDataFormat(mc, fmt));
+				if(fmt == FileFormat.CSV)
+					cd.setFileFormatProperties(new FileFormatPropertiesCSV(header, delim,
+						DataExpression.DEFAULT_DELIM_SPARSE));
+				cd.enableCleanup(false); // guard against deletion
+
+				_frc.setData(filename, cd);
+			} catch(Exception ex) {
+				_frc.setInvalid(filename);
+				throw ex;
 			}
 		}
-		catch(DMLPrivacyException | FederatedWorkerHandlerException ex) {
-			throw ex;
-		}
-		catch(Exception ex) {
-			throw new DMLRuntimeException(ex);
-		}
-		finally {
-			IOUtilFunctions.closeSilently(fs);
-		}
 
-		// put meta data object in symbol table, read on first operation
-		cd.setMetaData(new MetaDataFormat(mc, fmt));
-		if(fmt == FileFormat.CSV)
-			cd.setFileFormatProperties(new FileFormatPropertiesCSV(header, delim, DataExpression.DEFAULT_DELIM_SPARSE));
-		cd.enableCleanup(false); // guard against deletion
-		_ecm.get(tid).setVariable(String.valueOf(id), cd);
+		ecm.get(tid).setVariable(String.valueOf(id), cd);
 
 		if(DMLScript.LINEAGE)
 			// create a literal type lineage item with the file name
-			_ecm.get(tid).getLineage().set(String.valueOf(id), new LineageItem(filename));
+			ecm.get(tid).getLineage().set(String.valueOf(id), new LineageItem(filename));
 
 		if(dataType == Types.DataType.FRAME) {
 			FrameObject frameObject = (FrameObject) cd;
@@ -274,10 +323,10 @@ public class FederatedWorkerHandler extends ChannelInboundHandlerAdapter {
 		return new FederatedResponse(ResponseType.SUCCESS, new Object[] {id, mc});
 	}
 
-	private FederatedResponse putVariable(FederatedRequest request) {
+	private FederatedResponse putVariable(FederatedRequest request, ExecutionContextMap ecm) {
 		checkNumParams(request.getNumParams(), 1, 2);
 		final String varName = String.valueOf(request.getID());
-		ExecutionContext ec = _ecm.get(request.getTID());
+		ExecutionContext ec = ecm.get(request.getTID());
 
 		if(ec.containsVariable(varName)) {
 			Data tgtData = ec.removeVariable(varName);
@@ -304,15 +353,16 @@ public class FederatedWorkerHandler extends ChannelInboundHandlerAdapter {
 
 		// set variable and construct empty response
 		ec.setVariable(varName, data);
-		if(DMLScript.LINEAGE)
+		if(DMLScript.LINEAGE && request.getNumParams()==1)
+			// don't trace if the data contains only metadata
 			ec.getLineage().set(varName, new LineageItem(String.valueOf(request.getChecksum(0))));
 
 		return new FederatedResponse(ResponseType.SUCCESS_EMPTY);
 	}
 
-	private FederatedResponse getVariable(FederatedRequest request) {
+	private FederatedResponse getVariable(FederatedRequest request, ExecutionContextMap ecm) {
 		checkNumParams(request.getNumParams(), 0);
-		ExecutionContext ec = _ecm.get(request.getTID());
+		ExecutionContext ec = ecm.get(request.getTID());
 		if(!ec.containsVariable(String.valueOf(request.getID())))
 			throw new FederatedWorkerHandlerException(
 				"Variable " + request.getID() + " does not exist at federated worker.");
@@ -334,11 +384,20 @@ public class FederatedWorkerHandler extends ChannelInboundHandlerAdapter {
 		}
 	}
 
-	private FederatedResponse execInstruction(FederatedRequest request) throws Exception {
-		ExecutionContext ec = _ecm.get(request.getTID());
+	private FederatedResponse execInstruction(FederatedRequest request, ExecutionContextMap ecm) throws Exception {
+		ExecutionContext ec = ecm.get(request.getTID());
+		
+		//handle missing spark execution context
+		//TODO handling of spark instructions should be under control of federated site not coordinator
+		Instruction receivedInstruction = InstructionParser.parseSingleInstruction((String) request.getParam(0));
+		if(receivedInstruction.getType() == IType.SPARK
+			&& !(ec instanceof SparkExecutionContext) ) {
+			ecm.convertToSparkCtx();
+			ec = ecm.get(request.getTID());
+		}
+
 		BasicProgramBlock pb = new BasicProgramBlock(null);
 		pb.getInstructions().clear();
-		Instruction receivedInstruction = InstructionParser.parseSingleInstruction((String) request.getParam(0));
 		pb.getInstructions().add(receivedInstruction);
 
 		if(DMLScript.LINEAGE)
@@ -353,9 +412,9 @@ public class FederatedWorkerHandler extends ChannelInboundHandlerAdapter {
 		return new FederatedResponse(ResponseType.SUCCESS_EMPTY);
 	}
 
-	private FederatedResponse execUDF(FederatedRequest request) {
+	private FederatedResponse execUDF(FederatedRequest request, ExecutionContextMap ecm) {
 		checkNumParams(request.getNumParams(), 1);
-		ExecutionContext ec = _ecm.get(request.getTID());
+		ExecutionContext ec = ecm.get(request.getTID());
 
 		// get function and input parameters
 		// FIXME: handle HE privacy constraints
@@ -389,19 +448,21 @@ public class FederatedWorkerHandler extends ChannelInboundHandlerAdapter {
 		catch(Exception ex) {
 			// Note it is unsafe to throw the ex trace along with the exception here.
 			String msg = "Exception of type " + ex.getClass() + " thrown when processing EXEC_UDF request";
+			LOG.error(msg, ex);
 			throw new FederatedWorkerHandlerException(msg);
 		}
 	}
 
-	private FederatedResponse execClear() {
+	private FederatedResponse execClear(ExecutionContextMap ecm) {
 		try {
-			_ecm.clear();
+			ecm.clear();
 		}
 		catch(DMLPrivacyException | FederatedWorkerHandlerException ex) {
 			throw ex;
 		}
 		catch(Exception ex) {
 			String msg = "Exception of type " + ex.getClass() + " thrown when processing CLEAR request";
+			LOG.error(msg, ex);
 			throw new FederatedWorkerHandlerException(msg);
 		}
 		return new FederatedResponse(ResponseType.SUCCESS_EMPTY);
