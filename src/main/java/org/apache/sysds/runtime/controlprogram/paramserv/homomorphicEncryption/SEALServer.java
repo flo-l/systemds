@@ -1,10 +1,8 @@
 package org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption;
 
 import org.apache.sysds.common.Types;
-import org.apache.sysds.conf.ConfigurationManager;
 import org.apache.sysds.hops.OptimizerUtils;
 import org.apache.sysds.runtime.controlprogram.caching.MatrixObject;
-import org.apache.sysds.runtime.controlprogram.context.ExecutionContext;
 import org.apache.sysds.runtime.data.DenseBlock;
 import org.apache.sysds.runtime.data.DenseBlockFactory;
 import org.apache.sysds.runtime.instructions.cp.CiphertextMatrix;
@@ -12,11 +10,9 @@ import org.apache.sysds.runtime.instructions.cp.Encrypted;
 import org.apache.sysds.runtime.instructions.cp.PlaintextMatrix;
 import org.apache.sysds.runtime.matrix.data.MatrixBlock;
 import org.apache.sysds.runtime.meta.DataCharacteristics;
-import org.apache.sysds.runtime.meta.MatrixCharacteristics;
 import org.apache.sysds.runtime.meta.MetaDataFormat;
 import org.apache.sysds.utils.NativeHelper;
 
-import java.nio.DoubleBuffer;
 import java.util.Arrays;
 
 public class SEALServer {
@@ -85,28 +81,4 @@ public class SEALServer {
         }
         return raw_data;
     }
-
-    /*
-
-        private static long[] extractData(Data matrix_object) {
-        MatrixObject mobj = (MatrixObject) matrix_object;
-        return DataConverter.toLong(mobj.acquireReadAndRelease().getDenseBlockValues());
-    }
-
-        ListObject old_model = getResult();
-        ListObject new_model = new ListObject(old_model);
-
-        for (int i = 0; i < new_model.getLength(); i++) {
-            MatrixObject old_obj = (MatrixObject) new_model.getData(i);
-            MatrixBlock old_matrix_block = old_obj.acquireReadAndRelease();
-            DenseBlock old_dense_block = old_matrix_block.getDenseBlock();
-            int[] dims = IntStream.range(0, 4).map(old_dense_block::getDim).toArray();
-
-            DenseBlock new_dense_block = DenseBlockFactory.createDenseBlock(new_model_data[i], dims);
-            MatrixBlock new_matrix_block = new MatrixBlock(old_matrix_block.getNumRows(), old_matrix_block.getNumColumns(), new_dense_block);
-            MatrixObject new_obj = ExecutionContext.createMatrixObject(old_obj.getMetaData().getDataCharacteristics());
-            new_obj.acquireModify(new_matrix_block);
-            new_model.set(i, new_obj);
-        }
-     */
 }

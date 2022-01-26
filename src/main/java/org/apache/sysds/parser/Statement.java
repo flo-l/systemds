@@ -122,10 +122,6 @@ public abstract class Statement implements ParseInfo
 	public static final String PS_FED_AGGREGATION_FNAME = "1701-NCC-aggregation_fname";
 	public static final String PS_FED_MODEL_VARID = "1701-NCC-model_varid";
 
-	// homomorphic encryption
-	public static final String PS_FED_HE_PUBKEY = "1701-NCC-he-public-key";
-
-
 	public abstract boolean controlStatement();
 	
 	public abstract VariableSet variablesRead();

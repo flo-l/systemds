@@ -2,7 +2,6 @@ package org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption;
 
 import org.apache.sysds.runtime.controlprogram.caching.MatrixObject;
 import org.apache.sysds.runtime.data.DenseBlock;
-import org.apache.sysds.runtime.data.DenseBlockFactory;
 import org.apache.sysds.runtime.instructions.cp.CiphertextMatrix;
 import org.apache.sysds.runtime.instructions.cp.PlaintextMatrix;
 import org.apache.sysds.runtime.matrix.data.MatrixBlock;

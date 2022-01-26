@@ -301,7 +301,6 @@
 					<reportFormat>brief</reportFormat>
 					<trimStackTrace>true</trimStackTrace>
 					<rerunFailingTestsCount>${rerun.failing.tests.count}</rerunFailingTestsCount>
-					<argLine>-Xcheck:jni</argLine>
 				</configuration>
 			</plugin>
 

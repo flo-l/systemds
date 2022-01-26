@@ -358,6 +358,7 @@ public class FederatedWorkerHandler extends ChannelInboundHandlerAdapter {
 		ExecutionContext ec = _ecm.get(request.getTID());
 
 		// get function and input parameters
+		// FIXME: handle HE privacy constraints
 		FederatedUDF udf = (FederatedUDF) request.getParam(0);
 		Data[] inputs = Arrays.stream(udf.getInputIDs()).mapToObj(id -> ec.getVariable(String.valueOf(id)))
 			.toArray(Data[]::new);

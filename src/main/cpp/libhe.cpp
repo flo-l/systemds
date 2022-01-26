@@ -14,9 +14,6 @@
 #include "seal/util/rlwe.h"
 #include "seal/util/polyarithsmallmod.h"
 
-// TODO: generalize all methods to accept vectors of plaintexts/ciphertexts
-// TODO: write serialization methods (prob just a pointer for JNI in C++ land)
-
 using namespace std;
 using namespace seal;
 
