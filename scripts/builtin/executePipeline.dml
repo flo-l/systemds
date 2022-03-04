@@ -53,21 +53,21 @@
 # changesByOp         Matrix[Double]             ---
 # ----------------------------------------------------------------------------------------------------------------------
 
-s_executePipeline = function(Frame[String] logical = as.frame("NULL"), Frame[String] pipeline, Matrix[Double] Xtrain,  Matrix[Double] Ytrain, 
+s_executePipeline = function(Frame[String] pipeline, Matrix[Double] Xtrain,  Matrix[Double] Ytrain, 
   Matrix[Double] Xtest,  Matrix[Double] Ytest, List[Unknown] metaList, Matrix[Double] hyperParameters, Matrix[Double] hpForPruning = as.matrix(0),
   Matrix[Double] changesByOp = as.matrix(0), Integer flagsCount, Boolean test = FALSE, Boolean verbose)
   return (Matrix[Double] Xtrain, Matrix[Double] Ytrain, Matrix[Double] Xtest, Matrix[Double] Ytest,
-    Double t2, Matrix[Double] hpForPruning, Matrix[Double] changesByOp)
+    Double t2, Matrix[Double] hpForPruning, Matrix[Double] changesByOp, Double changesAll)
 {
 
   mask=as.matrix(metaList['mask'])
   FD = as.matrix(metaList['fd'])
   applyFunc = as.frame(metaList['applyFunc'])
-
+  changesAll = 0.0
+  d = ncol(Xtrain)
   testRow = nrow(Xtest)
-  Xout = Xtrain
+  Xorig = Xtest
   t1 = time()
-  print("PIPELINE EXECUTION START ... "+toString(pipeline))
   if(verbose) {
     print("checks   rows in X = "+nrow(Xtrain)+" rows in Y = "+nrow(Ytrain)+" cols in X = "+ncol(Xtrain)+" col in Y = "+ncol(Ytrain))
     print("pipeline in execution "+toString(pipeline))
@@ -75,23 +75,21 @@ s_executePipeline = function(Frame[String] logical = as.frame("NULL"), Frame[Str
   }
   for(i in 1:ncol(pipeline)) {
     op = as.scalar(pipeline[1,i])
-    lgOp = as.scalar(logical[1,i])
     applyOp = toString(as.scalar(applyFunc[1,i]))
+
     Xclone = Xtrain
     XtestClone = Xtest
     [hp, dataFlag, yFlag, executeFlag] = matrixToList(Xtrain, Ytrain, mask, FD, hyperParameters[i], flagsCount, op)
-    print("executing: ---------- "+toString(op))
     if(executeFlag == 1) {
       L = evalList(op, hp)
       [L, O] = remove(L, 1);
       Xtrain = as.matrix(O)
-      if(lgOp != "CI" & applyOp != "") {
+      if(applyOp != "NA") {
         [Xtest, executeFlag] = applyDataFlag(Xtest, mask, dataFlag)
         L = append(L, list(X=Xtest));
         Xtest = eval(applyOp, L);
         Xtest = confirmData(Xtest, XtestClone, mask, dataFlag, yFlag)
       }
-      Xout = Xtrain
       Xtrain = confirmData(Xtrain, Xclone, mask, dataFlag, yFlag)
 
       # dataFlag 0 = only on numeric, 1 = on whole data
@@ -104,11 +102,13 @@ s_executePipeline = function(Frame[String] logical = as.frame("NULL"), Frame[Str
     else {
       print("not applying "+op+" executeFlag = 0")
     }
+    if(ncol(Xtest) == d) {
+      changesSingle = sum(abs(replace(target=Xtest, pattern=NaN, replacement=0) - replace(target=XtestClone, pattern=NaN, replacement=0))  > 0.001 )
+      changesAll  = sum(abs(replace(target=Xtest, pattern=NaN, replacement=0) - replace(target=Xorig, pattern=NaN, replacement=0))  > 0.001 )
     
-
-    if(as.scalar(pipeline[1, i]) == "outlierBySd" | as.scalar(pipeline[1, i]) == "outlierByIQR" | as.scalar(pipeline[1, i]) == "imputeByFd") {
-      changes = sum(abs(replace(target=Xout, pattern=NaN, replacement=0) - replace(target=as.matrix(hp[1]), pattern=NaN, replacement=0))  > 0.001 )
-      [hpForPruning, changesByOp] = storeDataForPrunning(pipeline, hyperParameters, hpForPruning,  changesByOp, changes, i)
+      if(as.scalar(pipeline[1, i]) == "outlierBySd" | as.scalar(pipeline[1, i]) == "outlierByIQR" | as.scalar(pipeline[1, i]) == "imputeByFd") {
+        [hpForPruning, changesByOp] = storeDataForPrunning(pipeline, hyperParameters, hpForPruning,  changesByOp, changesSingle, i)
+      }
     }
   }
 
@@ -116,8 +116,6 @@ s_executePipeline = function(Frame[String] logical = as.frame("NULL"), Frame[Str
   if(nrow(Xtest) != testRow)
     stop("executePipeline: test rows altered")
   t2 = floor((time() - t1) / 1e+6)
-
-  print("PIPELINE EXECUTION ENDED: "+t2+" ms")
 }
 
 # This function will convert the matrix row-vector into list
@@ -195,6 +193,7 @@ return(Matrix[Double] X,Integer executeFlag)
       X = removeEmpty(target=X, margin = "cols", select = mask)
     }
   }
+  else X = X
 }
 
 confirmMeta = function(Matrix[Double] X, Matrix[Double] mask)
@@ -222,7 +221,6 @@ return (Matrix[Double] X)
     # put nan back
     nanMask = replace(target = nanMask, pattern = 1, replacement = NaN)
     X = X + nanMask
-    # print("X less than equal to  zero "+sum(cat <= 0))
   }
 }
 
@@ -230,21 +228,15 @@ return (Matrix[Double] X)
 confirmData = function(Matrix[Double] nX, Matrix[Double] originalX, Matrix[Double] mask, Integer dataFlag, Integer yFlag)
 return (Matrix[Double] X)
 {
-  if(yFlag == 1)
-  {
-    Y = nX[, ncol(nX)]
-    nX = nX[, 1: ncol(nX) - 1]
-  
-  }
+
   if(dataFlag == 0 & (sum(mask) > 0) & (sum(mask) != ncol(originalX)))
   {
-    maxDummy = max(nX) + 1
+    maxDummy = max(replace(target=nX, pattern=NaN, replacement=0)) + 1
     nX = replace(target = nX, pattern = NaN, replacement = maxDummy)
     # X without numerics
     Xcat = removeEmpty(target=originalX, margin="cols", select=mask)
     nanMask = is.na(Xcat)
     Xcat = replace(target = Xcat, pattern = NaN, replacement = -1111)
-    # print("unchanged data \n"+toString(originalX, rows=10))
     
     # reconstruct the original matrix
     p = table(seq(1, ncol(nX)), removeEmpty(target=seq(1, ncol(mask)), margin="rows", 
@@ -258,7 +250,7 @@ return (Matrix[Double] X)
   }
   else if(dataFlag == 1 & (sum(mask) > 0) & (sum(mask) != ncol(originalX)))
   {
-    maxDummy = max(nX) + 1
+    maxDummy = max(replace(target=nX, pattern=NaN, replacement=0)) + 1
     nX = replace(target = nX, pattern = NaN, replacement = maxDummy)
     # X without categorical
     Xnum = removeEmpty(target=originalX, margin="cols", select=(mask==0))
@@ -275,11 +267,7 @@ return (Matrix[Double] X)
   
   }
   else X = nX
-    # print("recreated data \n"+toString(X, rows = 20))
-    
-  if(yFlag == 1)
-    X = cbind(X, Y)
-  
+
 }
 
 
@@ -392,9 +380,8 @@ return (Matrix[Double] X, Matrix[Double] Y)
     minClass = min(classes)
     maxClass = max(classes)
     diff = (maxClass - minClass)/sum(classes)
-    if(diff > 0.3)
+    if(diff > 0.2)
     {
-      #print("initiating oversampling")
       XY = order(target = cbind(Y, X),  by = 1, decreasing=FALSE, index.return=FALSE)
       synthesized = matrix(0,0,0) # initialize variable
       start_class = 1
@@ -405,7 +392,6 @@ return (Matrix[Double] X, Matrix[Double] Y)
       outSet = matrix(0, 0, ncol(XY))
       remainingRatio = ifelse((remainingRatio%%100) >= 50, remainingRatio+(100 - (remainingRatio%%100)),
       remainingRatio-(remainingRatio%%100))
-      #print("remaining ratio: "+remainingRatio)
       for(i in 1: nrow(k), check=0) {
         end_class = end_class + as.scalar(classes[i])
         class_t = XY[start_class:end_class, ]
@@ -421,9 +407,8 @@ return (Matrix[Double] X, Matrix[Double] Y)
       Y = XY[, 1]
       X = XY[, 2:ncol(XY)]
     }
-    else { 
-      print("smote not applicable")
-
+    else {
+      str = "smote not applicable"
     }
   }
 }
@@ -434,11 +419,11 @@ return (Matrix[Double] X, Matrix[Double] Y)
 ########################################################
 fillDefault = function(Matrix[Double] X)
 return(Matrix[Double] X, Matrix[Double] defaullt){
+  Mask = is.na(X)
   X = replace(target=X, pattern=NaN, replacement=0)
   cmax = colMaxs(X)
   cmin = colMins(X)
   defaullt = round(cmax - cmin)
-  Mask = is.na(X)
   Mask = Mask * defaullt
   X = X + Mask
 }
@@ -469,32 +454,60 @@ return(Matrix[Double] hpForPruning, Matrix[Double] changesByOp)
 flipLabels = function(Matrix[Double] X, Matrix[Double] Y, Double threshold, Integer maxIter =10, Boolean verbose = FALSE)
 return (Matrix[Double] X, Matrix[Double] Y)
 {
-  max_y = max(Y)
-  if(min(Y) != max(Y))
+  classes1 = table(Y, 1)
+  if(min(Y) != max(Y) & nrow(Y) > 1)
   {
     betas = multiLogReg(X=X, Y=Y, icpt=1, reg=1e-4, maxi=100, maxii=0, verbose=FALSE)
     [prob, yhat, accuracy] = multiLogRegPredict(X, betas, Y, FALSE)
     inc = ((yhat != Y) & (rowMaxs(prob) > threshold))
-    Xcor = removeEmpty(target = X, margin = "rows", select = (inc==0))
-    Ycor = removeEmpty(target = Y, margin = "rows", select = (inc==0))
-    while(sum(inc) > 0 & maxIter > 0)
+    while(sum(inc) > 0 & maxIter > 0 & min(Y) != max(Y) & nrow(Y) > 1)
     {
-      # print("inc vector "+toString(inc))
+      Xcor = removeEmpty(target = X, margin = "rows", select = (inc==0))
+      Ycor = removeEmpty(target = Y, margin = "rows", select = (inc==0))
       Xinc = removeEmpty(target = X, margin = "rows", select = inc)
       Yinc = removeEmpty(target = Y, margin = "rows", select = inc)
-      Yinc = matrix((max_y + 1), rows=nrow(Yinc), cols=1) - Yinc
-      [prob, yhat, accuracy] = multiLogRegPredict(Xinc, betas, Yinc, FALSE)
-      inc = ((yhat != Yinc) & (rowMaxs(prob) > threshold))
-      XcorI = removeEmpty(target = Xinc, margin = "rows", select = (inc==0))
-      YcorI = removeEmpty(target = Yinc, margin = "rows", select = (inc==0))
-      Xcor = rbind(Xcor, XcorI)
-      Ycor = rbind(Ycor, YcorI)
-      X = Xinc
-      Y = Yinc
-      print("maxIter: "+maxIter)
+      yhat = removeEmpty(target = yhat, margin = "rows", select = inc)
+      prob = removeEmpty(target = prob, margin = "rows", select = inc)
+      inc = removeEmpty(target = inc, margin = "rows", select = inc)
+      # # # replace with second best option
+      replaced = yhat
+      Yinc = yhat
+      X = rbind(Xcor, Xinc)
+      Y = rbind(Ycor, Yinc)
       maxIter = maxIter - 1
+      if(min(Y) != max(Y) & nrow(Y) > 1) {
+        betas = multiLogReg(X=X, Y=Y, icpt=1, reg=1e-4, maxi=100, maxii=0, verbose=FALSE)
+        [prob, yhat, accuracy] = multiLogRegPredict(X, betas, Y, FALSE)
+        inc = ((yhat != Y) & (rowMaxs(prob) > threshold))
+      }
     }
-    X = Xcor
-    Y = Ycor
+  }
+  classes = table(Y, 1)
+}
+
+# # # # wrapper for normalize
+m_normalize = function(Matrix[Double] X)
+  return (Matrix[Double] Y, Matrix[Double] cmin, Matrix[Double] cmax)
+{
+  # compute feature ranges for transformations
+  if(sum(is.na(X)) > 0) 
+    [cmin, cmax] = colMinMax(X); 
+  else {
+    cmin = colMins(X);
+    cmax = colMaxs(X);
+  }
+  Y = normalizeApply(X, cmin, cmax);
+}
+
+# # # get column min by removing NaN rows
+colMinMax = function(Matrix[Double] X)
+return (Matrix[Double] cmin, Matrix[Double] cmax)
+{
+  cmin = matrix(0, rows=1, cols=ncol(X))
+  cmax = matrix(0, rows=1, cols=ncol(X))
+  for(i in 1:ncol(X)) {
+    vec = removeEmpty(target=X[, i], margin="rows", select = (is.na(X[, i]) == 0))
+    cmin[1, i] = min(vec)
+    cmax[1, i] = max(vec)
   }
 }

@@ -49,7 +49,6 @@ m_mice= function(Matrix[Double] X, Matrix[Double] cMask, Integer iter = 3,
   Double threshold = 0.8, Boolean verbose = FALSE)
   return(Matrix[Double] output, Matrix[Double] meta, Double threshold, Frame[String] dM, List[Unknown] betaList)
 {
-
   if(ncol(X) < 2)
     stop("MICE can not be applied on single vectors.
          expected number of columns > 1 found: "+ncol(X))
@@ -76,13 +75,12 @@ m_mice= function(Matrix[Double] X, Matrix[Double] cMask, Integer iter = 3,
   X1 = X + (Mask1 * imputationVec)
   d = ncol(X1)
   n = nrow(X1)
-  
   # compute index of categorical features
   index = vectorToCsv(cMask)
   # specifications for one-hot encoding of categorical features
   jspecDC = "{ids:true, dummycode:["+index+"]}";
   [dX, dM] = transformencode(target=as.frame(X1), spec=jspecDC);
-  
+  dist = colDist(X1, cMask) # number of distinct items in categorical features
   for(k in 1:iter) # start iterative imputation
   {
     betaList = list()
@@ -90,7 +88,6 @@ m_mice= function(Matrix[Double] X, Matrix[Double] cMask, Integer iter = 3,
     Mask_Filled = Mask1 # use this to store predictions for missing values
     weightMatrix = Mask1 # uses this to keep track of probabilities less than threshold
     inverseMask = Mask1 == 0
-    dist = colDist(X1, cMask) # number of distinct items in categorical features
     meta = rbind(meta, dist)
     i=1; j=1; in_c=1;
 
@@ -148,10 +145,10 @@ m_mice= function(Matrix[Double] X, Matrix[Double] cMask, Integer iter = 3,
           prob = matrix(1, nrow(test_Y), 1)
         }
         else {
-          beta = multiLogReg(X=train_X, Y=train_Y, icpt = 2, tol = 0.0001, reg = 0.00001, 
+          beta = multiLogReg(X=train_X, Y=train_Y, icpt = 1, tol = 0.0001, reg = 0.00001, 
             maxi = 100, maxii=50, verbose=FALSE)
           # predicting missing values 
-          [prob,pred,acc] = multiLogRegPredict(X=test_X, B=beta, Y = test_Y)
+          [prob, pred, acc] = multiLogRegPredict(X=test_X, B=beta, Y = test_Y)
           prob = rowMaxs(prob)
         }
         validThreshold = prob > threshold
@@ -182,11 +179,19 @@ m_mice= function(Matrix[Double] X, Matrix[Double] cMask, Integer iter = 3,
 }
 
 
-colDist = function(Matrix[Double] X, Matrix[Double] mask)
-return (Matrix[Double] dist) {
-  catCols = X * mask
-  colDist = colMaxs(catCols)
-  dist = (mask == 0) + colDist
+colDist= function(Matrix[Double] X, Matrix[Double] mask)
+return (Matrix[Double] dist){
+ 
+  dist = matrix(1, 1, ncol(X))
+  X = replace(target=X, pattern=0, replacement=max(X)+1)
+  parfor(i in 1:ncol(X))
+  {
+    if(as.scalar(mask[,i]) == 1)
+    {
+      distT = table(X[, i], 1)
+      dist[1, i] = sum(distT != 0)
+    }
+  }
 }
 
 getInitialImputation = function(Matrix[Double] X, Matrix[Double] mask)

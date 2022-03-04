@@ -64,6 +64,7 @@ import org.apache.sysds.runtime.lineage.LineageItemUtils;
 import org.apache.sysds.runtime.meta.MatrixCharacteristics;
 import org.apache.sysds.runtime.meta.MetaDataAll;
 import org.apache.sysds.runtime.meta.MetaDataFormat;
+import org.apache.sysds.runtime.matrix.operators.MultiThreadedOperator;
 import org.apache.sysds.runtime.privacy.DMLPrivacyException;
 import org.apache.sysds.runtime.privacy.PrivacyMonitor;
 import org.apache.sysds.utils.Statistics;
@@ -250,33 +251,25 @@ public class FederatedWorkerHandler extends ChannelInboundHandlerAdapter {
 		LineageItem linItem = new LineageItem(filename);
 		CacheableData<?> cd = null;
 
-		if(!LineageCache.reuseFedRead(Long.toString(id), dataType, linItem, ec)) {
+		boolean linReuse = (!ReuseCacheType.isNone() && dataType == DataType.MATRIX);
+		if(!linReuse || !LineageCache.reuseFedRead(Long.toString(id), dataType, linItem, ec)) {
 			// Lookup read cache if reuse is disabled and we skipped storing in the
 			// lineage cache due to other constraints
-			// FIXME: It is possible that lineage reuse is enabled later. In that case
-			//  read cache may not be empty. Hence, it may be necessary to lookup both
-			//  the caches.
-			if (ReuseCacheType.isNone() || dataType != DataType.MATRIX)
-				cd = _frc.get(filename);
+			cd = _frc.get(filename, !linReuse);
 			try {
 				if(cd == null) { // data is neither in lineage cache nor in read cache
-					long t0 = !ReuseCacheType.isNone() ? System.nanoTime() : 0;
 					cd = readDataNoReuse(filename, dataType, mc); // actual read of the data
-					long t1 = !ReuseCacheType.isNone() ? System.nanoTime() : 0;
-					if(!ReuseCacheType.isNone() && dataType == DataType.MATRIX)
+					if(linReuse)
 						// put the object into the lineage cache
-						// FIXME: As we lazily read the actual data, this computetime
-						//  only records the metadata read. A small computetime wrongly
-						//  dictates the cache eviction logic to remove this entry early.
-						LineageCache.putFedReadObject(cd, linItem, ec, t1 - t0);
+						LineageCache.putFedReadObject(cd, linItem, ec);
 					else
 						_frc.setData(filename, cd); // set the data into the read cache entry
 				}
 				ec.setVariable(String.valueOf(id), cd);
 
 			} catch(Exception ex) {
-				if(!ReuseCacheType.isNone() && dataType == DataType.MATRIX)
-					LineageCache.putFedReadObject(null, linItem, ec, 0); // removing the placeholder
+				if(linReuse)
+					LineageCache.putFedReadObject(null, linItem, ec); // removing the placeholder
 				else
 					_frc.setInvalid(filename);
 				throw ex;
@@ -428,6 +421,12 @@ public class FederatedWorkerHandler extends ChannelInboundHandlerAdapter {
 			&& !(ec instanceof SparkExecutionContext) ) {
 			ecm.convertToSparkCtx();
 			ec = ecm.get(request.getTID());
+		}
+
+		// set the number of threads according to the number of processors on the federated worker
+		if(receivedInstruction.getOperator() instanceof MultiThreadedOperator) {
+			int numProcessors = Runtime.getRuntime().availableProcessors();
+			((MultiThreadedOperator)receivedInstruction.getOperator()).setNumThreads(numProcessors);
 		}
 
 		BasicProgramBlock pb = new BasicProgramBlock(null);

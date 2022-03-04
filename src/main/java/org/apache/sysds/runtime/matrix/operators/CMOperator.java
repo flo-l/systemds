@@ -23,7 +23,7 @@ package org.apache.sysds.runtime.matrix.operators;
 import org.apache.sysds.runtime.functionobjects.CM;
 import org.apache.sysds.runtime.functionobjects.ValueFunction;
 
-public class CMOperator extends Operator 
+public class CMOperator extends MultiThreadedOperator
 {
 	private static final long serialVersionUID = 4126894676505115420L;
 	
@@ -35,13 +35,14 @@ public class CMOperator extends Operator
 		CM2,
 		CM3,
 		CM4,
+		MIN,
+		MAX,
 		VARIANCE,
 		INVALID
 	}
 
 	public final ValueFunction fn;
 	public final AggregateOperationTypes aggOpType;
-	public final int k;
 
 	public CMOperator(ValueFunction op, AggregateOperationTypes agg) {
 		this(op, agg, 1);
@@ -51,21 +52,17 @@ public class CMOperator extends Operator
 		super(true);
 		fn = op;
 		aggOpType = agg;
-		k = numThreads;
+		_numThreads = numThreads;
 	}
 
 	public AggregateOperationTypes getAggOpType() {
 		return aggOpType;
 	}
-	
-	public int getNumThreads() {
-		return k;
-	}
-	
+
 	public CMOperator setCMAggOp(int order) {
 		AggregateOperationTypes agg = getCMAggOpType(order);
 		ValueFunction fn = CM.getCMFnObject(aggOpType);
-		return new CMOperator(fn, agg, k);
+		return new CMOperator(fn, agg, _numThreads);
 	}
 	
 	public static AggregateOperationTypes getCMAggOpType ( int order ) {
@@ -103,6 +100,10 @@ public class CMOperator extends Operator
 				return AggregateOperationTypes.CM4;
 			else
 				return AggregateOperationTypes.INVALID;
+		} else if (fn.equalsIgnoreCase("min")) {
+			return AggregateOperationTypes.MIN;
+		} else if (fn.equalsIgnoreCase("max")) {
+			return AggregateOperationTypes.MAX;
 		}
 		return AggregateOperationTypes.INVALID;
 	}
@@ -114,7 +115,7 @@ public class CMOperator extends Operator
 		switch( aggOpType )
 		{
 			case COUNT:
-			case MEAN: 
+			case MEAN:
 				ret = true; break;
 				
 			//NOTE: the following aggregation operators are not marked for partial aggregation 

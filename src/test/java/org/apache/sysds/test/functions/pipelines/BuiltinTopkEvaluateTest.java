@@ -25,6 +25,7 @@ import org.apache.sysds.test.TestConfiguration;
 import org.apache.sysds.test.TestUtils;
 import org.junit.Assert;
 import org.junit.Ignore;
+import org.junit.Test;
 
 public class BuiltinTopkEvaluateTest extends AutomatedTestBase {
 	//	private final static String TEST_NAME1 = "prioritized";
@@ -45,6 +46,7 @@ public class BuiltinTopkEvaluateTest extends AutomatedTestBase {
 
 	//TODO: debug test failure in git actions
 	@Ignore
+	@Test
 	public void testEvalPipClass() {
 		evalPip(0.8, "FALSE", INPUT+"/classification/", Types.ExecMode.SINGLE_NODE);
 	}
