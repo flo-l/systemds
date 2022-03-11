@@ -19,28 +19,6 @@
 
 package org.apache.sysds.runtime.instructions.cp;
 
-import static org.apache.sysds.parser.Statement.PS_AGGREGATION_FUN;
-import static org.apache.sysds.parser.Statement.PS_BATCH_SIZE;
-import static org.apache.sysds.parser.Statement.PS_EPOCHS;
-import static org.apache.sysds.parser.Statement.PS_FEATURES;
-import static org.apache.sysds.parser.Statement.PS_FED_RUNTIME_BALANCING;
-import static org.apache.sysds.parser.Statement.PS_FED_WEIGHTING;
-import static org.apache.sysds.parser.Statement.PS_FREQUENCY;
-import static org.apache.sysds.parser.Statement.PS_HYPER_PARAMS;
-import static org.apache.sysds.parser.Statement.PS_LABELS;
-import static org.apache.sysds.parser.Statement.PS_MODE;
-import static org.apache.sysds.parser.Statement.PS_MODEL;
-import static org.apache.sysds.parser.Statement.PS_MODELAVG;
-import static org.apache.sysds.parser.Statement.PS_NBATCHES;
-import static org.apache.sysds.parser.Statement.PS_PARALLELISM;
-import static org.apache.sysds.parser.Statement.PS_SCHEME;
-import static org.apache.sysds.parser.Statement.PS_SEED;
-import static org.apache.sysds.parser.Statement.PS_UPDATE_FUN;
-import static org.apache.sysds.parser.Statement.PS_UPDATE_TYPE;
-import static org.apache.sysds.parser.Statement.PS_VAL_FEATURES;
-import static org.apache.sysds.parser.Statement.PS_VAL_FUN;
-import static org.apache.sysds.parser.Statement.PS_VAL_LABELS;
-
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -85,6 +63,8 @@ import org.apache.sysds.runtime.privacy.PrivacyConstraint;
 import org.apache.sysds.runtime.util.ProgramConverter;
 import org.apache.sysds.utils.stats.ParamServStatistics;
 
+import static org.apache.sysds.parser.Statement.*;
+
 public class ParamservBuiltinCPInstruction extends ParameterizedBuiltinCPInstruction {
 	private static final Log LOG = LogFactory.getLog(ParamservBuiltinCPInstruction.class.getName());
 
@@ -97,6 +77,7 @@ public class ParamservBuiltinCPInstruction extends ParameterizedBuiltinCPInstruc
 	private static final PSUpdateType DEFAULT_TYPE = PSUpdateType.ASP;
 	public static final int DEFAULT_NBATCHES = 1;
 	private static final Boolean DEFAULT_MODELAVG = false;
+	private static final Boolean DEFAULT_HE = false;
 
 	public ParamservBuiltinCPInstruction(Operator op, LinkedHashMap<String, String> paramsMap, CPOperand out, String opcode, String istr) {
 		super(op, paramsMap, out, opcode, istr);
@@ -185,7 +166,7 @@ public class ParamservBuiltinCPInstruction extends ParameterizedBuiltinCPInstruc
 		boolean modelAvg = Boolean.parseBoolean(getParam(PS_MODELAVG));
 
 		// check if we need homomorphic encryption
-		boolean use_homomorphic_encryption_ = false;
+		boolean use_homomorphic_encryption_ = getHe();
 		for (int i = 0; i < workerNum; i++) {
 			use_homomorphic_encryption_ = use_homomorphic_encryption_ || checkIsPrivate(result._pFeatures.get(i));
 			use_homomorphic_encryption_ = use_homomorphic_encryption_ || checkIsPrivate(result._pLabels.get(i));
@@ -656,5 +637,11 @@ public class ParamservBuiltinCPInstruction extends ParameterizedBuiltinCPInstruc
 	private boolean checkIsPrivate(MatrixObject obj) {
 		PrivacyConstraint pc = obj.getPrivacyConstraint();
 		return pc != null && pc.hasPrivateElements();
+	}
+
+	private boolean getHe() {
+		if(!getParameterMap().containsKey(PS_HE))
+			return DEFAULT_HE;
+		return Boolean.parseBoolean(getParam(PS_HE));
 	}
 }
