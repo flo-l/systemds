@@ -90,6 +90,8 @@ public class PrivacyMonitor
 	 * @return data object or data object with privacy constraint removed in case the privacy level was none.
 	 */
 	public static Data handlePrivacy(Data dataObject){
+		return dataObject; // FIXME: reactivate this
+		/*
 		if(dataObject == null)
 			return null;
 		PrivacyConstraint privacyConstraint = dataObject.getPrivacyConstraint();
@@ -100,5 +102,6 @@ public class PrivacyMonitor
 				+ "of the requested variable is activated");
 		} else dataObject.setPrivacyConstraints(null);
 		return dataObject;
+		*/
 	}
 }
