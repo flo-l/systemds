@@ -60,6 +60,7 @@ import java.util.HashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.apache.sysds.runtime.util.ProgramConverter.*;
 
@@ -695,10 +696,11 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 			try {
 				ListObject model = (ListObject) res.getData()[0];
 				ListObject encrypted_model = new ListObject(model);
-				for (int matrix_idx = 0; matrix_idx < model.getLength(); matrix_idx++) {
+				IntStream.range(0, model.getLength()).parallel().forEach(matrix_idx -> {
 					CiphertextMatrix encrypted_matrix = ec.getSealClient().encrypt((MatrixObject) model.getData(matrix_idx));
 					encrypted_model.set(matrix_idx, encrypted_matrix);
-				}
+				});
+
 				// overwrite model with encryption
 				res.getData()[0] = encrypted_model;
 
@@ -724,9 +726,9 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 		@Override
 		public FederatedResponse execute(ExecutionContext ec, Data... data) {
 			PlaintextMatrix[] result = new PlaintextMatrix[_encrypted_sum.length];
-			for (int i = 0; i < result.length; i++) {
+			IntStream.range(0, result.length).parallel().forEach(i -> {
 				result[i] = ec.getSealClient().partiallyDecrypt(_encrypted_sum[i]);
-			}
+			});
 			return new FederatedResponse(FederatedResponse.ResponseType.SUCCESS, result);
 		}
 

@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * This class implements Homomorphic Encryption (HE) for LocalParamServer. It only supports modelAvg=true.
@@ -115,26 +116,27 @@ public class HEParamServer extends LocalParamServer {
 
     private CiphertextMatrix[] homomorphicAggregation(List<ListObject> encrypted_models) {
         CiphertextMatrix[] result = new CiphertextMatrix[encrypted_models.get(0).getLength()];
-        for (int matrix_idx = 0; matrix_idx < encrypted_models.get(0).getLength(); matrix_idx++) {
+        IntStream.range(0, encrypted_models.get(0).getLength()).parallel().forEach(matrix_idx -> {
             CiphertextMatrix[] summands = new CiphertextMatrix[encrypted_models.size()];
             for (int i = 0; i < encrypted_models.size(); i++) {
                 summands[i] = (CiphertextMatrix) encrypted_models.get(i).getData(matrix_idx);
             }
             result[matrix_idx] = _seal_server.accumulateCiphertexts(summands);;
-        }
+        });
         return result;
     }
 
     private Void homomorphicAverage(CiphertextMatrix[] encrypted_sums, List<PlaintextMatrix[]> partial_decryptions) {
         MatrixObject[] result = new MatrixObject[partial_decryptions.get(0).length];
-        for (int matrix_idx = 0; matrix_idx < partial_decryptions.get(0).length; matrix_idx++) {
+
+        IntStream.range(0, partial_decryptions.get(0).length).parallel().forEach(matrix_idx -> {
             PlaintextMatrix[] partial_plaintexts = new PlaintextMatrix[partial_decryptions.size()];
             for (int i = 0; i < partial_decryptions.size(); i++) {
                 partial_plaintexts[i] = partial_decryptions.get(i)[matrix_idx];
             }
 
             result[matrix_idx] = _seal_server.average(encrypted_sums[matrix_idx], partial_plaintexts);
-        }
+        });
 
         ListObject old_model = getResult();
         ListObject new_model = new ListObject(old_model);
