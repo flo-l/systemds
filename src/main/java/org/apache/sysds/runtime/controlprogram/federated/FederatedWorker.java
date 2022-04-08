@@ -44,6 +44,7 @@ import org.apache.sysds.api.DMLScript;
 import org.apache.log4j.Logger;
 import org.apache.sysds.conf.ConfigurationManager;
 import org.apache.sysds.conf.DMLConfig;
+import org.apache.sysds.runtime.controlprogram.paramserv.NetworkTrafficCounter;
 import org.apache.sysds.runtime.lineage.LineageCacheConfig;
 
 public class FederatedWorker {
@@ -76,6 +77,7 @@ public class FederatedWorker {
 		// TODO add ability to use real ssl files, not self signed certificates.
 		SelfSignedCertificate cert = new SelfSignedCertificate();
 		final SslContext cont2 = SslContextBuilder.forServer(cert.certificate(), cert.privateKey()).build();
+		final NetworkTrafficCounter ntc = new NetworkTrafficCounter(FederatedStatistics::logWorkerTraffic);
 
 		try {
 			b.group(bossGroup, workerGroup).channel(NioServerSocketChannel.class)
@@ -88,6 +90,7 @@ public class FederatedWorker {
 							.getBooleanValue(DMLConfig.USE_SSL_FEDERATED_COMMUNICATION)) {
 							cp.addLast(cont2.newHandler(ch.alloc()));
 						}
+						cp.addLast("NetworkTrafficCounter", ntc);
 						cp.addLast("ObjectDecoder",
 							new ObjectDecoder(Integer.MAX_VALUE,
 								ClassResolvers.weakCachingResolver(ClassLoader.getSystemClassLoader())));

@@ -28,8 +28,6 @@ import java.util.concurrent.Future;
 
 import javax.net.ssl.SSLException;
 
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.sysds.common.Types;
@@ -175,6 +173,7 @@ public class FederatedData {
 		try {
 			Bootstrap b = new Bootstrap();
 			final DataRequestHandler handler = new DataRequestHandler(workerGroup);
+			final NetworkTrafficCounter ntc = new NetworkTrafficCounter(FederatedStatistics::logServerTraffic);
 			// Client Netty
 			b.group(workerGroup).channel(NioSocketChannel.class).handler(new ChannelInitializer<SocketChannel>() {
 				@Override
@@ -188,7 +187,7 @@ public class FederatedData {
 					if(timeout > -1)
 						cp.addLast("timeout",new ReadTimeoutHandler(timeout));
 
-					cp.addLast("Bandwidth Logger", new NetworkTrafficCounter());
+					cp.addLast("NetworkTrafficCounter", ntc);
 					cp.addLast("ObjectDecoder",
 						new ObjectDecoder(Integer.MAX_VALUE,
 							ClassResolvers.weakCachingResolver(ClassLoader.getSystemClassLoader())));

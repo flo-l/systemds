@@ -1,39 +1,23 @@
 package org.apache.sysds.runtime.controlprogram.paramserv;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPromise;
-import org.apache.log4j.Logger;
+import io.netty.handler.traffic.ChannelTrafficShapingHandler;
+import java.util.function.BiConsumer;
 
-public class NetworkTrafficCounter extends ChannelDuplexHandler {
-    private static final Logger LOG = Logger.getLogger(NetworkTrafficCounter.class);
-
-    private long incoming;
-    private long outgoing;
-    public NetworkTrafficCounter() {}
-
-    @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        incoming += ((ByteBuf)msg).readableBytes();
-        ctx.fireChannelRead(msg);
+@ChannelHandler.Sharable
+public class NetworkTrafficCounter extends ChannelTrafficShapingHandler {
+    private final BiConsumer<Long, Long> _fn; // (read, written) -> Void, logs bytes read and written
+    public NetworkTrafficCounter(BiConsumer<Long, Long> fn) {
+        // checkInterval of zero means that doAccounting will not be called
+        super( 0);
+        _fn = fn;
     }
 
+    // log bytes read/written after channel is closed
     @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-        LOG.debug("READ: " + incoming + "\n");
-        ctx.fireChannelReadComplete();
-    }
-
-    @Override
-    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-        outgoing += ((ByteBuf)msg).readableBytes();
-        ctx.write(msg, promise);
-    }
-
-    @Override
-    public void flush(ChannelHandlerContext ctx) throws Exception {
-        LOG.debug("WRITE: " + outgoing + "\n");
-        ctx.flush();
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        _fn.accept(trafficCounter.cumulativeReadBytes(), trafficCounter.cumulativeWrittenBytes());
+        super.channelInactive(ctx);
     }
 }
