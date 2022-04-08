@@ -71,7 +71,7 @@ EncryptionParameters generateParameters() {
 
     size_t poly_modulus_degree = 8192;
     parms.set_poly_modulus_degree(poly_modulus_degree);
-    parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, { 60, 40, 40, 60 }));
+    parms.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, { 60, 60 }));
     return parms;
 }
 
