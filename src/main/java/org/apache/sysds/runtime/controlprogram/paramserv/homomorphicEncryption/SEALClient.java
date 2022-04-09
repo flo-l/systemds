@@ -39,8 +39,10 @@ public class SEALClient {
 
 
     /**
-     * generates a partial public key and returns it
+     * generates a partial public key
      * stores a partial private key corresponding to the partial public key in ctx
+     *
+     * @return the partial public key
      */
     public PublicKey generatePartialPublicKey() {
         return new PublicKey(NativeHelper.generatePartialPublicKey(ctx));
@@ -48,6 +50,8 @@ public class SEALClient {
 
     /**
      * sets the public key and stores it in ctx
+     *
+     * @param public_key the public key to set
      */
     public void setPublicKey(PublicKey public_key) {
         NativeHelper.setPublicKey(ctx, public_key.getData());
@@ -56,7 +60,8 @@ public class SEALClient {
     /**
      * encrypts one block of data with public key stored statically and returns it
      * setPublicKey() must have been called before calling this
-     * half_block is half the size of SEAL slot_count
+     * @param plaintext the MatrixObject to encrypt
+     * @return the encrypted matrix
      */
     public CiphertextMatrix encrypt(MatrixObject plaintext) {
         MatrixBlock mb = plaintext.acquireReadAndRelease();
@@ -71,9 +76,11 @@ public class SEALClient {
     }
 
     /**
-     * partially decrypts one block with the partial private key. generatePartialPublicKey() must
+     * partially decrypts ciphertext with the partial private key. generatePartialPublicKey() must
      * have been called before calling this function
-     * returns a block half the size of SEAL slot_count
+     *
+     * @param ciphertext the ciphertext to partially decrypt
+     * @return the partial decryption of ciphertext
      */
     public PlaintextMatrix partiallyDecrypt(CiphertextMatrix ciphertext) {
         return new PlaintextMatrix(ciphertext.getDims(), ciphertext.getDataCharacteristics(), NativeHelper.partiallyDecrypt(ctx, ciphertext.getData()));

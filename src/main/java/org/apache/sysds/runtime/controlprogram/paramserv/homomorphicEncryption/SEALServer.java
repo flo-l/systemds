@@ -46,6 +46,7 @@ public class SEALServer {
 
     /**
      * this generates the a constant. in a future version we want to generate this together with the clients to prevent misuse
+     * @return serialized a constant
      */
     public synchronized byte[] generateA() {
         if (_a == null) {
@@ -56,6 +57,8 @@ public class SEALServer {
 
     /**
      * accumulates the given partial public keys into a public key, stores it in ctx and returns it
+     * @param partial_public_keys an array of partial public keys generated with SEALServer::generatePartialPublicKey
+     * @return the aggregated public key
      */
     public PublicKey aggregatePartialPublicKeys(PublicKey[] partial_public_keys) {
         return new PublicKey(NativeHelper.aggregatePartialPublicKeys(ctx, extractRawData(partial_public_keys)));
@@ -63,16 +66,18 @@ public class SEALServer {
 
     /**
      * accumulates the given ciphertext blocks into a sum ciphertext and returns it
-     * stores c0 of the sum to be used in averageBlocks()
+     * @param ciphertexts ciphertexts encrypted with the partial public keys
+     * @return the accumulated ciphertext (which is the homomorphic sum of ciphertexts)
      */
     public CiphertextMatrix accumulateCiphertexts(CiphertextMatrix[] ciphertexts) {
         return new CiphertextMatrix(ciphertexts[0].getDims(), ciphertexts[0].getDataCharacteristics(), NativeHelper.accumulateCiphertexts(ctx, extractRawData(ciphertexts)));
     }
 
     /**
-     * averages the partial decryptions and stores the result in old_mo
-     * encrypted_sum is the result of accumulateCiphertexts() and partial_plaintexts is the result of partiallyDecryptBlock
-     * of each ciphertext fed into accumulateCiphertexts
+     * averages the partial decryptions
+     * @param encrypted_sum is the result of accumulateCiphertexts()
+     * @param partial_plaintexts is the result of SEALServer::partiallyDecrypt of each ciphertext fed into accumulateCiphertexts
+     * @return the unencrypted, element-wise average of the original matrices
      */
     public MatrixObject average(CiphertextMatrix encrypted_sum, PlaintextMatrix[] partial_plaintexts) {
         double[] raw_result = NativeHelper.average(ctx, encrypted_sum.getData(), extractRawData(partial_plaintexts));
