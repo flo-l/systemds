@@ -21,6 +21,7 @@ package org.apache.sysds.utils.stats;
 
 import java.util.concurrent.atomic.LongAdder;
 
+import org.apache.sysds.api.DMLScript;
 import org.apache.sysds.runtime.controlprogram.parfor.stat.Timing;
 
 public class ParamServStatistics {
@@ -41,6 +42,10 @@ public class ParamServStatistics {
 	private static final LongAdder fedWorkerComputingTime = new LongAdder();
 	private static final LongAdder fedGradientWeightingTime = new LongAdder();
 	private static final LongAdder fedCommunicationTime = new LongAdder();
+	// Homomorphic encryption specifics (time is in milli sec)
+	private static final LongAdder heEncryption = new LongAdder(); // SEALClient::encrypt
+	private static final LongAdder hePartialDecryption = new LongAdder(); // SEALClient::partiallyDecrypt
+	private static final LongAdder heDecryption = new LongAdder(); // SEALServer::average
 
 	public static void incWorkerNumber() {
 		numWorkers.increment();
@@ -118,6 +123,18 @@ public class ParamServStatistics {
 		fedCommunicationTime.add(t);
 	}
 
+	public static void accHEEncryptionTime(long t) {
+		heEncryption.add(t);
+	}
+
+	public static void accHEPartialDecryptionTime(long t) {
+		hePartialDecryption.add(t);
+	}
+
+	public static void accHEDecryptionTime(long t) {
+		heDecryption.add(t);
+	}
+
 	public static void reset() {
 		executionTime.reset();
 		numWorkers.reset();
@@ -133,6 +150,9 @@ public class ParamServStatistics {
 		fedWorkerComputingTime.reset();
 		fedGradientWeightingTime.reset();
 		fedCommunicationTime.reset();
+		heEncryption.reset();
+		hePartialDecryption.reset();
+		heDecryption.reset();
 	}
 
 	public static String displayStatistics() {
@@ -155,6 +175,7 @@ public class ParamServStatistics {
 				sb.append(String.format("Paramserv RPC request time:\t%.3f secs.\n", rpcRequestTime.doubleValue() / 1000));
 			}
 			sb.append(String.format("Paramserv valdiation time:\t%.3f secs.\n", validationTime.doubleValue() / 1000));
+			sb.append(displayHEPSStatistics());
 			return sb.toString();
 		}
 		return "";
@@ -166,6 +187,14 @@ public class ParamServStatistics {
 		sb.append(String.format("PS fed comm time (cum):\t\t%.3f secs.\n", fedCommunicationTime.doubleValue() / 1000));
 		sb.append(String.format("PS fed worker comp time (cum):\t%.3f secs.\n", fedWorkerComputingTime.doubleValue() / 1000));
 		sb.append(String.format("PS fed grad. weigh. time (cum):\t%.3f secs.\n", fedGradientWeightingTime.doubleValue() / 1000));
+		return sb.toString();
+	}
+
+	private static String displayHEPSStatistics() {
+		StringBuilder sb = new StringBuilder();
+		sb.append(String.format("HE PS encryption time:\t%.3f secs.\n", heEncryption.doubleValue() / 1000));
+		sb.append(String.format("HE PS partial decryption time:\t%.3f secs.\n", hePartialDecryption.doubleValue() / 1000));
+		sb.append(String.format("HE PS decryption time:\t%.3f secs.\n", heDecryption.doubleValue() / 1000));
 		return sb.toString();
 	}
 }

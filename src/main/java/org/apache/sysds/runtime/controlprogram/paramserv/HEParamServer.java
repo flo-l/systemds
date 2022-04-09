@@ -19,14 +19,17 @@
 
 package org.apache.sysds.runtime.controlprogram.paramserv;
 
+import org.apache.sysds.api.DMLScript;
 import org.apache.sysds.parser.Statement;
 import org.apache.sysds.runtime.controlprogram.caching.MatrixObject;
 import org.apache.sysds.runtime.controlprogram.context.ExecutionContext;
 import org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption.PublicKey;
 import org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption.SEALServer;
+import org.apache.sysds.runtime.controlprogram.parfor.stat.Timing;
 import org.apache.sysds.runtime.instructions.cp.CiphertextMatrix;
 import org.apache.sysds.runtime.instructions.cp.ListObject;
 import org.apache.sysds.runtime.instructions.cp.PlaintextMatrix;
+import org.apache.sysds.utils.stats.ParamServStatistics;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -115,6 +118,7 @@ public class HEParamServer extends LocalParamServer {
     }
 
     private CiphertextMatrix[] homomorphicAggregation(List<ListObject> encrypted_models) {
+        Timing tAgg = DMLScript.STATISTICS ? new Timing(true) : null;
         CiphertextMatrix[] result = new CiphertextMatrix[encrypted_models.get(0).getLength()];
         IntStream.range(0, encrypted_models.get(0).getLength()).parallel().forEach(matrix_idx -> {
             CiphertextMatrix[] summands = new CiphertextMatrix[encrypted_models.size()];
@@ -123,10 +127,15 @@ public class HEParamServer extends LocalParamServer {
             }
             result[matrix_idx] = _seal_server.accumulateCiphertexts(summands);;
         });
+        if (tAgg != null) {
+            ParamServStatistics.accAggregationTime((long)tAgg.stop());
+        }
         return result;
     }
 
     private Void homomorphicAverage(CiphertextMatrix[] encrypted_sums, List<PlaintextMatrix[]> partial_decryptions) {
+        Timing tDecrypt = DMLScript.STATISTICS ? new Timing(true) : null;
+
         MatrixObject[] result = new MatrixObject[partial_decryptions.get(0).length];
 
         IntStream.range(0, partial_decryptions.get(0).length).parallel().forEach(matrix_idx -> {
@@ -143,6 +152,11 @@ public class HEParamServer extends LocalParamServer {
         for (int i = 0; i < new_model.getLength(); i++) {
             new_model.set(i, result[i]);
         }
+
+        if (tDecrypt != null) {
+            ParamServStatistics.accHEDecryptionTime((long)tDecrypt.stop());
+        }
+
         updateAndBroadcastModel(new_model, null);
         return null;
     }

@@ -34,12 +34,8 @@ import org.apache.sysds.runtime.controlprogram.FunctionProgramBlock;
 import org.apache.sysds.runtime.controlprogram.ProgramBlock;
 import org.apache.sysds.runtime.controlprogram.caching.MatrixObject;
 import org.apache.sysds.runtime.controlprogram.context.ExecutionContext;
-import org.apache.sysds.runtime.controlprogram.federated.FederatedData;
-import org.apache.sysds.runtime.controlprogram.federated.FederatedRequest;
+import org.apache.sysds.runtime.controlprogram.federated.*;
 import org.apache.sysds.runtime.controlprogram.federated.FederatedRequest.RequestType;
-import org.apache.sysds.runtime.controlprogram.federated.FederatedResponse;
-import org.apache.sysds.runtime.controlprogram.federated.FederatedUDF;
-import org.apache.sysds.runtime.controlprogram.federated.FederationUtils;
 import org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption.PublicKey;
 import org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption.SEALClient;
 import org.apache.sysds.runtime.controlprogram.parfor.stat.Timing;
@@ -380,6 +376,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 	@Override
 	public Void call() throws Exception {
 		try {
+			Timing tTotal = new Timing(true);
 			switch (_freq) {
 				case BATCH:
 					computeWithBatchUpdates();
@@ -681,7 +678,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 
 		@Override
 		public FederatedResponse execute(ExecutionContext ec, Data... data_without_deferred) {
-			Timing tGradients = new Timing(true);
+			Timing tTotal = new Timing(true);
 			// add features and gradients to data
 			Data[] deferred_inputs = Arrays.stream(_deferredIds).mapToObj(id -> ec.getVariable(String.valueOf(id))).toArray(Data[]::new);
 			Data[] data = Arrays.copyOf(deferred_inputs, deferred_inputs.length + data_without_deferred.length);
@@ -694,6 +691,8 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 
 			// encrypt model with SEAL
 			try {
+				Timing tEncrypt = DMLScript.STATISTICS ? new Timing(true) : null;
+
 				ListObject model = (ListObject) res.getData()[0];
 				ListObject encrypted_model = new ListObject(model);
 				IntStream.range(0, model.getLength()).parallel().forEach(matrix_idx -> {
@@ -704,8 +703,12 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 				// overwrite model with encryption
 				res.getData()[0] = encrypted_model;
 
+				if (tEncrypt != null) {
+					ParamServStatistics.accHEEncryptionTime((long)tEncrypt.stop());
+				}
+
 				// stop timing
-				DoubleObject gradientsTime = new DoubleObject(tGradients.stop());
+				DoubleObject gradientsTime = new DoubleObject(tTotal.stop());
 				res.getData()[1] = gradientsTime;
 			} catch (Exception e) {
 				return new FederatedResponse(FederatedResponse.ResponseType.ERROR, new Object[] { e });
@@ -725,10 +728,14 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 
 		@Override
 		public FederatedResponse execute(ExecutionContext ec, Data... data) {
+			Timing tPartialDecrypt = DMLScript.STATISTICS ? new Timing(true) : null;
 			PlaintextMatrix[] result = new PlaintextMatrix[_encrypted_sum.length];
 			IntStream.range(0, result.length).parallel().forEach(i -> {
 				result[i] = ec.getSealClient().partiallyDecrypt(_encrypted_sum[i]);
 			});
+			if (tPartialDecrypt != null) {
+				ParamServStatistics.accHEPartialDecryptionTime((long)tPartialDecrypt.stop());
+			}
 			return new FederatedResponse(FederatedResponse.ResponseType.SUCCESS, result);
 		}
 
