@@ -128,7 +128,7 @@ public class HEParamServer extends LocalParamServer {
             result[matrix_idx] = _seal_server.accumulateCiphertexts(summands);;
         });
         if (tAgg != null) {
-            ParamServStatistics.accAggregationTime((long)tAgg.stop());
+            ParamServStatistics.accHEAccumulation((long)tAgg.stop());
         }
         return result;
     }
@@ -161,15 +161,32 @@ public class HEParamServer extends LocalParamServer {
         return null;
     }
 
+    // this is only to be used in push()
+    private Timing commTimer;
+    private void startCommTimer() {
+        commTimer = new Timing(true);
+    }
+    private long stopCommTimer() {
+        return (long)commTimer.stop();
+    }
+    // ---------------------------------
+
     @Override
     public void push(int workerID, ListObject encrypted_model) {
         // wait for all updates and sum them homomorphically
-        CiphertextMatrix[] homomorphic_sum = collectAndDo(workerID, encrypted_model, this::homomorphicAggregation);
+        CiphertextMatrix[] homomorphic_sum = collectAndDo(workerID, encrypted_model, x -> {
+            CiphertextMatrix[] res = this.homomorphicAggregation(x);
+            this.startCommTimer();
+            return res;
+        });
 
         // get partial decryptions
         PlaintextMatrix[] partial_decryption = _threads.get(workerID).getPartialDecryption(homomorphic_sum);
 
         // do average and update global model
-        collectAndDo(workerID, partial_decryption, x -> this.homomorphicAverage(homomorphic_sum, x));
+        collectAndDo(workerID, partial_decryption, x -> {
+            ParamServStatistics.accFedNetworkTime(this.stopCommTimer());
+            return this.homomorphicAverage(homomorphic_sum, x);
+        });
     }
 }

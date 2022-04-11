@@ -530,6 +530,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 				long workerComputing = ((DoubleObject) responseData[1]).getLongValue();
 				ParamServStatistics.accFedWorkerComputing(workerComputing);
 				ParamServStatistics.accFedCommunicationTime(total - workerComputing);
+				ParamServStatistics.accFedNetworkTime(total);
 			}
 			return (ListObject) responseData[0];
 		}

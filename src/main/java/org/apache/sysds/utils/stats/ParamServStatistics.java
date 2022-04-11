@@ -42,8 +42,10 @@ public class ParamServStatistics {
 	private static final LongAdder fedWorkerComputingTime = new LongAdder();
 	private static final LongAdder fedGradientWeightingTime = new LongAdder();
 	private static final LongAdder fedCommunicationTime = new LongAdder();
+	private static final LongAdder fedNetworkTime = new LongAdder(); // measures exactly how long it takes netty to send & receive data
 	// Homomorphic encryption specifics (time is in milli sec)
 	private static final LongAdder heEncryption = new LongAdder(); // SEALClient::encrypt
+	private static final LongAdder heAccumulation = new LongAdder(); // SEALServer::accumulateCiphertexts
 	private static final LongAdder hePartialDecryption = new LongAdder(); // SEALClient::partiallyDecrypt
 	private static final LongAdder heDecryption = new LongAdder(); // SEALServer::average
 
@@ -115,6 +117,10 @@ public class ParamServStatistics {
 		fedWorkerComputingTime.add(t);
 	}
 
+	public static void accFedNetworkTime(long t) {
+		fedNetworkTime.add(t);
+	}
+
 	public static void accFedGradientWeightingTime(long t) {
 		fedGradientWeightingTime.add(t);
 	}
@@ -125,6 +131,10 @@ public class ParamServStatistics {
 
 	public static void accHEEncryptionTime(long t) {
 		heEncryption.add(t);
+	}
+
+	public static void accHEAccumulation(long t) {
+		heAccumulation.add(t);
 	}
 
 	public static void accHEPartialDecryptionTime(long t) {
@@ -150,7 +160,9 @@ public class ParamServStatistics {
 		fedWorkerComputingTime.reset();
 		fedGradientWeightingTime.reset();
 		fedCommunicationTime.reset();
+		fedNetworkTime.reset();
 		heEncryption.reset();
+		heAccumulation.reset();
 		hePartialDecryption.reset();
 		heDecryption.reset();
 	}
@@ -175,7 +187,6 @@ public class ParamServStatistics {
 				sb.append(String.format("Paramserv RPC request time:\t%.3f secs.\n", rpcRequestTime.doubleValue() / 1000));
 			}
 			sb.append(String.format("Paramserv valdiation time:\t%.3f secs.\n", validationTime.doubleValue() / 1000));
-			sb.append(displayHEPSStatistics());
 			return sb.toString();
 		}
 		return "";
@@ -187,12 +198,20 @@ public class ParamServStatistics {
 		sb.append(String.format("PS fed comm time (cum):\t\t%.3f secs.\n", fedCommunicationTime.doubleValue() / 1000));
 		sb.append(String.format("PS fed worker comp time (cum):\t%.3f secs.\n", fedWorkerComputingTime.doubleValue() / 1000));
 		sb.append(String.format("PS fed grad. weigh. time (cum):\t%.3f secs.\n", fedGradientWeightingTime.doubleValue() / 1000));
+		sb.append(displayNetworkStatistics());
 		return sb.toString();
 	}
 
-	private static String displayHEPSStatistics() {
+	public static String displayNetworkStatistics() {
+		StringBuilder sb = new StringBuilder();
+		sb.append(String.format("PS fed network time (cum):\t\t%.3f secs.\n", fedNetworkTime.doubleValue() / 1000));
+		return sb.toString();
+	}
+
+	public static String displayHEPSStatistics() {
 		StringBuilder sb = new StringBuilder();
 		sb.append(String.format("HE PS encryption time:\t%.3f secs.\n", heEncryption.doubleValue() / 1000));
+		sb.append(String.format("HE PS accumulation time:\t%.3f secs.\n", heAccumulation.doubleValue() / 1000));
 		sb.append(String.format("HE PS partial decryption time:\t%.3f secs.\n", hePartialDecryption.doubleValue() / 1000));
 		sb.append(String.format("HE PS decryption time:\t%.3f secs.\n", heDecryption.doubleValue() / 1000));
 		return sb.toString();
