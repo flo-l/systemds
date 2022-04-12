@@ -49,6 +49,8 @@ public class ParamServStatistics {
 	private static final LongAdder hePartialDecryption = new LongAdder(); // SEALClient::partiallyDecrypt
 	private static final LongAdder heDecryption = new LongAdder(); // SEALServer::average
 
+	private static final LongAdder fedAggregation = new LongAdder(); // SEALServer::average
+
 	public static void incWorkerNumber() {
 		numWorkers.increment();
 	}
@@ -121,6 +123,10 @@ public class ParamServStatistics {
 		fedNetworkTime.add(t);
 	}
 
+	public static void accFedAggregation(long t) {
+		fedAggregation.add(t);
+	}
+
 	public static void accFedGradientWeightingTime(long t) {
 		fedGradientWeightingTime.add(t);
 	}
@@ -165,6 +171,7 @@ public class ParamServStatistics {
 		heAccumulation.reset();
 		hePartialDecryption.reset();
 		heDecryption.reset();
+		fedAggregation.reset();
 	}
 
 	public static String displayStatistics() {
@@ -198,18 +205,14 @@ public class ParamServStatistics {
 		sb.append(String.format("PS fed comm time (cum):\t\t%.3f secs.\n", fedCommunicationTime.doubleValue() / 1000));
 		sb.append(String.format("PS fed worker comp time (cum):\t%.3f secs.\n", fedWorkerComputingTime.doubleValue() / 1000));
 		sb.append(String.format("PS fed grad. weigh. time (cum):\t%.3f secs.\n", fedGradientWeightingTime.doubleValue() / 1000));
-		sb.append(displayNetworkStatistics());
 		return sb.toString();
 	}
 
-	public static String displayNetworkStatistics() {
+	public static String displayFloStatistics() {
 		StringBuilder sb = new StringBuilder();
-		sb.append(String.format("PS fed network time (cum):\t\t%.3f secs.\n", fedNetworkTime.doubleValue() / 1000));
-		return sb.toString();
-	}
-
-	public static String displayHEPSStatistics() {
-		StringBuilder sb = new StringBuilder();
+		sb.append(String.format("PS fed network time (cum):\t%.3f secs.\n", fedNetworkTime.doubleValue() / 1000));
+		sb.append(String.format("PS fed agg time:\t%.3f secs.\n", fedAggregation.doubleValue() / 1000));
+		sb.append(String.format("Paramserv grad compute time:\t%.3f secs.\n", gradientComputeTime.doubleValue() / 1000));
 		sb.append(String.format("HE PS encryption time:\t%.3f secs.\n", heEncryption.doubleValue() / 1000));
 		sb.append(String.format("HE PS accumulation time:\t%.3f secs.\n", heAccumulation.doubleValue() / 1000));
 		sb.append(String.format("HE PS partial decryption time:\t%.3f secs.\n", hePartialDecryption.doubleValue() / 1000));

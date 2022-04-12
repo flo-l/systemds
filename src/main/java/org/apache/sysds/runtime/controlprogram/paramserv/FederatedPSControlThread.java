@@ -434,12 +434,17 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 				int localStartBatchNum = getNextLocalBatchNum(currentLocalBatchNumber++, _possibleBatchesPerLocalEpoch);
 				ListObject model = pullModel();
 				ListObject gradients = computeGradientsForNBatches(model, 1, localStartBatchNum);
+
+				Timing tAgg = DMLScript.STATISTICS ? new Timing(true) : null;
 				if (_modelAvg && !_use_homomorphic_encryption)
 					// we can't call the agg fn if we use HE, because it is implemented homomorphically in SEALServer::aggregateCiphertexts
 					model = _ps.updateLocalModel(_ec, gradients, model);
 				else
 					ParamservUtils.cleanupListObject(model);
 				weightAndPushGradients((_modelAvg && !_use_homomorphic_encryption) ? model : gradients);
+				if (tAgg != null) {
+					ParamServStatistics.accFedAggregation((long)tAgg.stop());
+				}
 				ParamservUtils.cleanupListObject(gradients);
 			}
 		}
@@ -458,7 +463,13 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 				currentLocalBatchNumber = currentLocalBatchNumber + _numBatchesPerNbatch;
 				ListObject model = pullModel();
 				ListObject gradients = computeGradientsForNBatches(model, _numBatchesPerNbatch, localStartBatchNum, true);
+
+				Timing tAgg = DMLScript.STATISTICS ? new Timing(true) : null;
 				weightAndPushGradients(gradients);
+				if (tAgg != null) {
+					ParamServStatistics.accFedAggregation((long)tAgg.stop());
+				}
+
 				ParamservUtils.cleanupListObject(model);
 				ParamservUtils.cleanupListObject(gradients);
 			}
@@ -475,7 +486,13 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 			// Pull the global parameters from ps
 			ListObject model = pullModel();
 			ListObject gradients = computeGradientsForNBatches(model, _numBatchesPerEpoch, localStartBatchNum, true);
+
+			Timing tAgg = DMLScript.STATISTICS ? new Timing(true) : null;
 			weightAndPushGradients(gradients);
+			if (tAgg != null) {
+				ParamServStatistics.accFedAggregation((long)tAgg.stop());
+			}
+
 			ParamservUtils.cleanupListObject(model);
 			ParamservUtils.cleanupListObject(gradients);
 		}
@@ -654,6 +671,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 
 			// stop timing
 			DoubleObject gradientsTime = new DoubleObject(tGradients.stop());
+			ParamServStatistics.accGradientComputeTime(gradientsTime.getLongValue());
 			return new FederatedResponse(FederatedResponse.ResponseType.SUCCESS,
 					new Object[]{modelAvg ? model : accGradients, gradientsTime});
 		}
