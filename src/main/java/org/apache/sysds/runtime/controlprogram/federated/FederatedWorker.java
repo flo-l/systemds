@@ -53,6 +53,7 @@ public class FederatedWorker {
 	private final FederatedReadCache _frc;
 	private final boolean _debug;
 	private Timing networkTimer = new Timing();
+	private final static NetworkTrafficCounter _ntc = new NetworkTrafficCounter(FederatedStatistics::logWorkerTraffic);
 
 	public FederatedWorker(int port, boolean debug) {
 		_flt = new FederatedLookupTable();
@@ -76,7 +77,6 @@ public class FederatedWorker {
 		// TODO add ability to use real ssl files, not self signed certificates.
 		SelfSignedCertificate cert = new SelfSignedCertificate();
 		final SslContext cont2 = SslContextBuilder.forServer(cert.certificate(), cert.privateKey()).build();
-		final NetworkTrafficCounter ntc = new NetworkTrafficCounter(FederatedStatistics::logWorkerTraffic);
 
 		try {
 			b.group(bossGroup, workerGroup).channel(NioServerSocketChannel.class)
@@ -88,7 +88,7 @@ public class FederatedWorker {
 							.getBooleanValue(DMLConfig.USE_SSL_FEDERATED_COMMUNICATION)) {
 							cp.addLast(cont2.newHandler(ch.alloc()));
 						}
-						cp.addLast("NetworkTrafficCounter", ntc);
+						cp.addLast("NetworkTrafficCounter", _ntc);
 						cp.addLast("ObjectDecoder",
 							new ObjectDecoder(Integer.MAX_VALUE,
 								ClassResolvers.weakCachingResolver(ClassLoader.getSystemClassLoader())));

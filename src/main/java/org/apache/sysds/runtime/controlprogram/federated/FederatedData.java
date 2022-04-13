@@ -54,11 +54,11 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.concurrent.Promise;
-import org.apache.sysds.utils.stats.ParamServStatistics;
 
 public class FederatedData {
 	private static final Log LOG = LogFactory.getLog(FederatedData.class.getName());
 	private static final Set<InetSocketAddress> _allFedSites = new HashSet<>();
+	private static final NetworkTrafficCounter _ntc = new NetworkTrafficCounter(FederatedStatistics::logServerTraffic);
 
 	/** A Singleton constructed SSL context, that only is assigned if ssl is enabled. */
 	private static SslContextMan instance = null;
@@ -171,7 +171,6 @@ public class FederatedData {
 		try {
 			Bootstrap b = new Bootstrap();
 			final DataRequestHandler handler = new DataRequestHandler(workerGroup);
-			final NetworkTrafficCounter ntc = new NetworkTrafficCounter(FederatedStatistics::logServerTraffic);
 			// Client Netty
 			b.group(workerGroup).channel(NioSocketChannel.class).handler(new ChannelInitializer<SocketChannel>() {
 				@Override
@@ -185,7 +184,7 @@ public class FederatedData {
 					if(timeout > -1)
 						cp.addLast("timeout",new ReadTimeoutHandler(timeout));
 
-					cp.addLast("NetworkTrafficCounter", ntc);
+					cp.addLast("NetworkTrafficCounter", _ntc);
 					cp.addLast("ObjectDecoder",
 						new ObjectDecoder(Integer.MAX_VALUE,
 							ClassResolvers.weakCachingResolver(ClassLoader.getSystemClassLoader())));
