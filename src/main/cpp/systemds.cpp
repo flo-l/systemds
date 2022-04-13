@@ -261,10 +261,10 @@ unique_ptr<istream> get_stream(JNIEnv* env, jbyteArray ary) {
     size_t size = env->GetArrayLength(ary);
     jbyte* data = env->GetByteArrayElements(ary, NULL);
 
-    // FIXME: this copies string data TWICE. maybe implement a custom stream
+    // FIXME: this copies string data once. maybe implement a custom stream
     // idea: implement a custom stream that wraps a jbyteArray, which calls ReleaseByteArrayElements in its d'tor
     string data_s = string(reinterpret_cast<char*>(data), size);
-    unique_ptr<istream> ret = std::make_unique<istringstream>(data_s);
+    unique_ptr<istream> ret = std::make_unique<istringstream>(std::move(data_s));
     env->ReleaseByteArrayElements(ary, data, JNI_ABORT);
     return ret;
 }
