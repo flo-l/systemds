@@ -380,6 +380,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_encrypt
         Ciphertext encrypted_chunk = client->encrypted_data(data_span);
         encrypted_chunk.save(ss);
     }
+    env->ReleaseDoubleArrayElements(jdata, const_cast<jdouble*>(data), JNI_ABORT);
     return allocate_byte_array(env, ss);
 }
 
@@ -435,6 +436,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_aggregateP
     for (int i = 0; i < num_partial_public_keys; i++) {
         jbyteArray j_data = static_cast<jbyteArray>(env->GetObjectArrayElement(partial_public_keys_serialized, i));
         partial_public_keys.push_back(deserialize_unsafe<Ciphertext>(env, server->context(), j_data));
+        env->DeleteLocalRef(j_data);
     }
 
     server->accumulate_partial_public_keys(gsl::span(partial_public_keys));
@@ -454,6 +456,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_accumulate
         jbyteArray j_data = static_cast<jbyteArray>(env->GetObjectArrayElement(ciphertexts_serialized, i));
         auto stream = get_stream(env, j_data);
         buf.emplace_back(std::move(stream));
+        env->DeleteLocalRef(j_data);
     }
 
     // read lengths of ciphertext arys and check that they are all the same
@@ -494,6 +497,7 @@ JNIEXPORT jdoubleArray JNICALL Java_org_apache_sysds_utils_NativeHelper_average
         jbyteArray j_data = static_cast<jbyteArray>(env->GetObjectArrayElement(partial_decryptions_serialized, i));
         auto stream = get_stream(env, j_data);
         buf.emplace_back(std::move(stream));
+        env->DeleteLocalRef(j_data);
     }
 
     // read lengths of ciphertext arys and check that they are all the same
