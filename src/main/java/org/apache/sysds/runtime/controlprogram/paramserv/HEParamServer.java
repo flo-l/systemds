@@ -120,7 +120,7 @@ public class HEParamServer extends LocalParamServer {
     private CiphertextMatrix[] homomorphicAggregation(List<ListObject> encrypted_models) {
         Timing tAgg = DMLScript.STATISTICS ? new Timing(true) : null;
         CiphertextMatrix[] result = new CiphertextMatrix[encrypted_models.get(0).getLength()];
-        IntStream.range(0, encrypted_models.get(0).getLength()).parallel().forEach(matrix_idx -> {
+        IntStream.range(0, encrypted_models.get(0).getLength()).forEach(matrix_idx -> {
             CiphertextMatrix[] summands = new CiphertextMatrix[encrypted_models.size()];
             for (int i = 0; i < encrypted_models.size(); i++) {
                 summands[i] = (CiphertextMatrix) encrypted_models.get(i).getData(matrix_idx);
@@ -138,7 +138,7 @@ public class HEParamServer extends LocalParamServer {
 
         MatrixObject[] result = new MatrixObject[partial_decryptions.get(0).length];
 
-        IntStream.range(0, partial_decryptions.get(0).length).parallel().forEach(matrix_idx -> {
+        IntStream.range(0, partial_decryptions.get(0).length).forEach(matrix_idx -> {
             PlaintextMatrix[] partial_plaintexts = new PlaintextMatrix[partial_decryptions.size()];
             for (int i = 0; i < partial_decryptions.size(); i++) {
                 partial_plaintexts[i] = partial_decryptions.get(i)[matrix_idx];

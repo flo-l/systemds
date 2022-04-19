@@ -714,7 +714,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 
 				ListObject model = (ListObject) res.getData()[0];
 				ListObject encrypted_model = new ListObject(model);
-				IntStream.range(0, model.getLength()).parallel().forEach(matrix_idx -> {
+				IntStream.range(0, model.getLength()).forEach(matrix_idx -> {
 					CiphertextMatrix encrypted_matrix = ec.getSealClient().encrypt((MatrixObject) model.getData(matrix_idx));
 					encrypted_model.set(matrix_idx, encrypted_matrix);
 				});
@@ -749,7 +749,7 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
 		public FederatedResponse execute(ExecutionContext ec, Data... data) {
 			Timing tPartialDecrypt = DMLScript.STATISTICS ? new Timing(true) : null;
 			PlaintextMatrix[] result = new PlaintextMatrix[_encrypted_sum.length];
-			IntStream.range(0, result.length).parallel().forEach(i -> {
+			IntStream.range(0, result.length).forEach(i -> {
 				result[i] = ec.getSealClient().partiallyDecrypt(_encrypted_sum[i]);
 			});
 			if (tPartialDecrypt != null) {
