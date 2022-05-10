@@ -53,7 +53,6 @@ public class FederatedWorker {
 	private final FederatedReadCache _frc;
 	private final boolean _debug;
 	private Timing networkTimer = new Timing();
-	private final static NetworkTrafficCounter _ntc = new NetworkTrafficCounter(FederatedStatistics::logWorkerTraffic);
 
 	public FederatedWorker(int port, boolean debug) {
 		_flt = new FederatedLookupTable();
@@ -88,7 +87,7 @@ public class FederatedWorker {
 							.getBooleanValue(DMLConfig.USE_SSL_FEDERATED_COMMUNICATION)) {
 							cp.addLast(cont2.newHandler(ch.alloc()));
 						}
-						cp.addLast("NetworkTrafficCounter", _ntc);
+						cp.addLast("NetworkTrafficCounter", new NetworkTrafficCounter(FederatedStatistics::logWorkerTraffic));
 						cp.addLast("ObjectDecoder",
 							new ObjectDecoder(Integer.MAX_VALUE,
 								ClassResolvers.weakCachingResolver(ClassLoader.getSystemClassLoader())));

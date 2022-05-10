@@ -5,7 +5,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.traffic.ChannelTrafficShapingHandler;
 import java.util.function.BiConsumer;
 
-@ChannelHandler.Sharable
 public class NetworkTrafficCounter extends ChannelTrafficShapingHandler {
     private final BiConsumer<Long, Long> _fn; // (read, written) -> Void, logs bytes read and written
     public NetworkTrafficCounter(BiConsumer<Long, Long> fn) {
@@ -18,6 +17,7 @@ public class NetworkTrafficCounter extends ChannelTrafficShapingHandler {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         _fn.accept(trafficCounter.cumulativeReadBytes(), trafficCounter.cumulativeWrittenBytes());
+        trafficCounter.resetCumulativeTime();
         super.channelInactive(ctx);
     }
 }

@@ -58,7 +58,6 @@ import io.netty.util.concurrent.Promise;
 public class FederatedData {
 	private static final Log LOG = LogFactory.getLog(FederatedData.class.getName());
 	private static final Set<InetSocketAddress> _allFedSites = new HashSet<>();
-	private static final NetworkTrafficCounter _ntc = new NetworkTrafficCounter(FederatedStatistics::logServerTraffic);
 
 	/** A Singleton constructed SSL context, that only is assigned if ssl is enabled. */
 	private static SslContextMan instance = null;
@@ -184,7 +183,7 @@ public class FederatedData {
 					if(timeout > -1)
 						cp.addLast("timeout",new ReadTimeoutHandler(timeout));
 
-					cp.addLast("NetworkTrafficCounter", _ntc);
+					cp.addLast("NetworkTrafficCounter", new NetworkTrafficCounter(FederatedStatistics::logServerTraffic));
 					cp.addLast("ObjectDecoder",
 						new ObjectDecoder(Integer.MAX_VALUE,
 							ClassResolvers.weakCachingResolver(ClassLoader.getSystemClassLoader())));
