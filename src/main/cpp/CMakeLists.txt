@@ -82,7 +82,7 @@ elseif(USE_INTEL_MKL)
 endif()
 
 find_package(SEAL 3.7 REQUIRED)
-target_link_libraries(systemds SEAL::seal_shared)
+target_link_libraries(systemds SEAL::seal)
 
 # Include directories. (added for Linux & Darwin, fix later for windows)
 # include paths can be spurious
