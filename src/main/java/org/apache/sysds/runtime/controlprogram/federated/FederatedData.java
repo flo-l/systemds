@@ -38,6 +38,7 @@ import org.apache.sysds.conf.DMLConfig;
 
 import org.apache.sysds.runtime.DMLRuntimeException;
 import org.apache.sysds.runtime.controlprogram.federated.FederatedRequest.RequestType;
+import org.apache.sysds.runtime.controlprogram.paramserv.NetworkTimer;
 import org.apache.sysds.runtime.controlprogram.paramserv.NetworkTrafficCounter;
 import org.apache.sysds.runtime.controlprogram.parfor.stat.Timing;
 import org.apache.sysds.runtime.meta.MetaData;
@@ -183,6 +184,7 @@ public class FederatedData {
 					if(timeout > -1)
 						cp.addLast("timeout",new ReadTimeoutHandler(timeout));
 
+					cp.addLast("NetworkTimer", new NetworkTimer(FederatedStatistics::logServerNetworkTime));
 					cp.addLast("NetworkTrafficCounter", new NetworkTrafficCounter(FederatedStatistics::logServerTraffic));
 					cp.addLast("ObjectDecoder",
 						new ObjectDecoder(Integer.MAX_VALUE,
