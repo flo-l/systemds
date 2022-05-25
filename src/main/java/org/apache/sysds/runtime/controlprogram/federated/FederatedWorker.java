@@ -48,7 +48,6 @@ import org.apache.sysds.api.DMLScript;
 import org.apache.log4j.Logger;
 import org.apache.sysds.conf.ConfigurationManager;
 import org.apache.sysds.conf.DMLConfig;
-import org.apache.sysds.runtime.controlprogram.paramserv.NetworkTimer;
 import org.apache.sysds.runtime.controlprogram.paramserv.NetworkTrafficCounter;
 import org.apache.sysds.runtime.controlprogram.parfor.stat.Timing;
 import org.apache.sysds.runtime.lineage.LineageCacheConfig;
@@ -95,7 +94,6 @@ public class FederatedWorker {
 							.getBooleanValue(DMLConfig.USE_SSL_FEDERATED_COMMUNICATION)) {
 							cp.addLast(cont2.newHandler(ch.alloc()));
 						}
-						cp.addLast("NetworkTimer", new NetworkTimer(FederatedStatistics::logWorkerNetworkTime));
 						cp.addLast("NetworkTrafficCounter", new NetworkTrafficCounter(FederatedStatistics::logWorkerTraffic));
 						cp.addLast("ObjectDecoder",
 							new ObjectDecoder(Integer.MAX_VALUE,

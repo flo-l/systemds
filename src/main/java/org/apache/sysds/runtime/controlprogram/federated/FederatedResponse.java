@@ -38,11 +38,20 @@ public class FederatedResponse implements Serializable {
 		SUCCESS_EMPTY,
 		ERROR,
 	}
-	
+
 	private ResponseType _status;
 	private Object[] _data;
 	private Map<PrivacyLevel,LongAdder> checkedConstraints;
-	
+	private double _worker_timing = 0.0;
+
+	public double getWorkerTiming() {
+		return _worker_timing;
+	}
+
+	public void setWorkerTiming(double _worker_timing) {
+		this._worker_timing = _worker_timing;
+	}
+
 	public FederatedResponse(ResponseType status) {
 		this(status, null);
 	}

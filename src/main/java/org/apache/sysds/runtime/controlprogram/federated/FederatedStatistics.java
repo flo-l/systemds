@@ -84,7 +84,6 @@ public class FederatedStatistics {
 	private static final LongAdder fedBytesReceived = new LongAdder();
 
 	private static final DoubleAdder fedServerNetworkTime = new DoubleAdder();
-	private static final DoubleAdder fedWorkerNetworkTime = new DoubleAdder();
 
 	public static void logServerTraffic(long read, long written) {
 		bytesReceived.add(read);
@@ -98,10 +97,6 @@ public class FederatedStatistics {
 
 	public static void logServerNetworkTime(double timing) {
 		fedServerNetworkTime.add(timing);
-	}
-
-	public static void logWorkerNetworkTime(double timing) {
-		fedWorkerNetworkTime.add(timing);
 	}
 
 	public static synchronized void incFederated(RequestType rqt, List<Object> data){
@@ -173,7 +168,6 @@ public class FederatedStatistics {
 		fedBytesSent.reset();
 		fedBytesReceived.reset();
 		fedServerNetworkTime.reset();
-		fedWorkerNetworkTime.reset();
 	}
 
 	public static String displayFedIOExecStatistics() {
@@ -215,8 +209,7 @@ public class FederatedStatistics {
 				fedBytesReceived.longValue() +
 				"/" +
 				fedBytesSent.longValue() +
-				"\n" +
-				"Worker Network time (s):\t" + fedWorkerNetworkTime.sum() / 1000 + "\n";
+				"\n";
 	}
 
 

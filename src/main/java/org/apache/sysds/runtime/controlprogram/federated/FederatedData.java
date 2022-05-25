@@ -29,20 +29,16 @@ import java.util.concurrent.Future;
 
 import javax.net.ssl.SSLException;
 
-import io.netty.channel.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.sysds.api.DMLScript;
 import org.apache.sysds.common.Types;
 import org.apache.sysds.conf.ConfigurationManager;
 import org.apache.sysds.conf.DMLConfig;
 
 import org.apache.sysds.runtime.DMLRuntimeException;
 import org.apache.sysds.runtime.controlprogram.federated.FederatedRequest.RequestType;
-import org.apache.sysds.runtime.controlprogram.paramserv.NetworkTimer;
 import org.apache.sysds.runtime.controlprogram.paramserv.NetworkTrafficCounter;
 import org.apache.sysds.runtime.controlprogram.parfor.stat.Timing;
-import org.apache.sysds.runtime.DMLRuntimeException;
 import org.apache.sysds.runtime.meta.MetaData;
 
 import io.netty.bootstrap.Bootstrap;
@@ -193,7 +189,6 @@ public class FederatedData {
 					if(timeout > -1)
 						cp.addLast("timeout",new ReadTimeoutHandler(timeout));
 
-					cp.addLast("NetworkTimer", new NetworkTimer(FederatedStatistics::logServerNetworkTime));
 					cp.addLast("NetworkTrafficCounter", new NetworkTrafficCounter(FederatedStatistics::logServerTraffic));
 					cp.addLast("ObjectDecoder",
 						new ObjectDecoder(Integer.MAX_VALUE,
@@ -248,8 +243,16 @@ public class FederatedData {
 		private Promise<FederatedResponse> _prom;
 		private EventLoopGroup _workerGroup;
 
+		private final Timing _timing = new Timing();
+
 		public DataRequestHandler(EventLoopGroup workerGroup) {
 			_workerGroup = workerGroup;
+		}
+
+		@Override
+		public void channelActive(ChannelHandlerContext ctx) throws Exception {
+			_timing.start();
+			super.channelActive(ctx);
 		}
 
 		public void setPromise(Promise<FederatedResponse> prom) {
@@ -260,7 +263,11 @@ public class FederatedData {
 		public void channelRead(ChannelHandlerContext ctx, Object msg) {
 			if(_prom == null)
 				throw new DMLRuntimeException("Read while no message was sent");
-			_prom.setSuccess((FederatedResponse) msg);
+			FederatedResponse r = (FederatedResponse) msg;
+			if (r.getWorkerTiming() != 0.0) {
+				FederatedStatistics.logServerNetworkTime(Math.max(0.0, _timing.stop() - r.getWorkerTiming()));
+			}
+			_prom.setSuccess(r);
 			ctx.close();
 			_workerGroup.shutdownGracefully();
 		}

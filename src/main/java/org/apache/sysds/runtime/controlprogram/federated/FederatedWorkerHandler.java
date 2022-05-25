@@ -165,6 +165,8 @@ public class FederatedWorkerHandler extends ChannelInboundHandlerAdapter {
 
 	private FederatedResponse createResponse(FederatedRequest[] requests, String remoteHost)
 		throws DMLPrivacyException, FederatedWorkerHandlerException, Exception {
+		final Timing timing = new Timing(true);
+
 		FederatedResponse response = null; // last response
 		boolean containsCLEAR = false;
 		for(int i = 0; i < requests.length; i++) {
@@ -205,6 +207,9 @@ public class FederatedWorkerHandler extends ChannelInboundHandlerAdapter {
 		if(containsCLEAR)
 			printStatistics();
 
+		if (response != null) {
+			response.setWorkerTiming(timing.stop());
+		}
 		return response;
 	}
 
