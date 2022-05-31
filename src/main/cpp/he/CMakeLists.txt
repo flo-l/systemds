@@ -54,7 +54,7 @@ set(CMAKE_BUILD_TYPE Release)
 set_target_properties(he PROPERTIES OUTPUT_NAME "he-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
 
 find_package(SEAL 3.7 REQUIRED)
-target_link_libraries(he SEAL::seal)
+target_link_libraries(he SEAL::seal_shared)
 
 # Include directories. (added for Linux & Darwin, fix later for windows)
 # include paths can be spurious
