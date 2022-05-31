@@ -303,6 +303,8 @@ public class FederatedPSControlThread extends PSWorker implements Callable<Void>
         public FederatedResponse execute(ExecutionContext ec, Data... data) {
 			// TODO: set other CKKS parameters
 			// TODO generate partial public key
+			NativeHEHelper.initialize();
+
 			SEALClient sc = new SEALClient(_partial_pubkey_a);
 			ec.setSealClient(sc);
 			PublicKey partial_pubkey = sc.generatePartialPublicKey();

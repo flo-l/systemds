@@ -1,6 +1,15 @@
 package org.apache.sysds.runtime.controlprogram.paramserv;
 
+import org.apache.commons.lang.SystemUtils;
+import org.apache.sysds.utils.NativeHelper;
+
 public class NativeHEHelper {
+    public static boolean initialize() {
+        String platform_suffix = (SystemUtils.IS_OS_WINDOWS ? "-Windows-AMD64.dll" : "-Linux-x86_64.so");
+        String library_name = "libhe" + platform_suffix;
+        return NativeHelper.loadLibraryHelperFromResource(library_name);
+    }
+
     // ----------------------------------------------------------------------------------------------------------------
     // SEAL integration
     // ----------------------------------------------------------------------------------------------------------------

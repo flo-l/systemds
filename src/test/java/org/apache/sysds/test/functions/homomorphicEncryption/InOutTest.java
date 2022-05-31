@@ -21,6 +21,7 @@ package org.apache.sysds.test.functions.homomorphicEncryption;
 
 import org.apache.sysds.common.Types;
 import org.apache.sysds.runtime.controlprogram.caching.MatrixObject;
+import org.apache.sysds.runtime.controlprogram.paramserv.NativeHEHelper;
 import org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption.PublicKey;
 import org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption.SEALClient;
 import org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption.SEALServer;
@@ -32,7 +33,6 @@ import org.apache.sysds.runtime.meta.MetaDataFormat;
 import org.apache.sysds.test.AutomatedTestBase;
 import org.apache.sysds.test.TestConfiguration;
 import org.apache.sysds.test.TestUtils;
-import org.apache.sysds.utils.NativeHelper;
 import org.junit.Test;
 
 public class InOutTest extends AutomatedTestBase {
@@ -49,7 +49,7 @@ public class InOutTest extends AutomatedTestBase {
     @Override
     public void setUp() {
         try {
-            NativeHelper.initialize("none", "openblas");
+            NativeHEHelper.initialize();
         } catch (Exception e) {
             throw e;
         }

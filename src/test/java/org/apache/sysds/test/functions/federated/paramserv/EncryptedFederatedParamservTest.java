@@ -26,11 +26,11 @@ import java.util.List;
 
 import org.apache.sysds.common.Types.ExecMode;
 import org.apache.sysds.hops.codegen.SpoofCompiler;
+import org.apache.sysds.runtime.controlprogram.paramserv.NativeHEHelper;
 import org.apache.sysds.runtime.privacy.PrivacyConstraint;
 import org.apache.sysds.test.AutomatedTestBase;
 import org.apache.sysds.test.TestConfiguration;
 import org.apache.sysds.test.TestUtils;
-import org.apache.sysds.utils.NativeHelper;
 import org.apache.sysds.utils.Statistics;
 import org.junit.Assert;
 import org.junit.Test;
@@ -96,7 +96,7 @@ public class EncryptedFederatedParamservTest extends AutomatedTestBase {
 	public EncryptedFederatedParamservTest(String networkType, int numFederatedWorkers, int dataSetSize, int batch_size,
 										  int epochs, double eta, String utype, String freq, String scheme, String runtime_balancing, String weighting, String data_distribution, int seed) {
 		try {
-			NativeHelper.initialize("none", "openblas");
+			NativeHEHelper.initialize();
 		} catch (Exception e) {
 			throw e;
 		}

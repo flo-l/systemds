@@ -29,6 +29,7 @@ import org.apache.sysds.runtime.controlprogram.parfor.stat.Timing;
 import org.apache.sysds.runtime.instructions.cp.CiphertextMatrix;
 import org.apache.sysds.runtime.instructions.cp.ListObject;
 import org.apache.sysds.runtime.instructions.cp.PlaintextMatrix;
+import org.apache.sysds.utils.NativeHelper;
 import org.apache.sysds.utils.stats.ParamServStatistics;
 
 import java.util.ArrayList;
@@ -52,6 +53,7 @@ public class HEParamServer extends LocalParamServer {
                                           Statement.PSFrequency freq, ExecutionContext ec, int workerNum, String valFunc, int numBatchesPerEpoch,
                                           MatrixObject valFeatures, MatrixObject valLabels, int nbatches)
     {
+        NativeHEHelper.initialize();
         return new HEParamServer(model, aggFunc, updateType, freq, ec,
                 workerNum, valFunc, numBatchesPerEpoch, valFeatures, valLabels, nbatches);
     }
