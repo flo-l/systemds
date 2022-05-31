@@ -324,7 +324,7 @@ template<typename T> T deserialize(JNIEnv* env, const SEALContext& context, jbyt
     return deserialized;
 }
 
-JNIEXPORT jlong JNICALL Java_org_apache_sysds_utils_NativeHelper_initClient
+JNIEXPORT jlong JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_initClient
   (JNIEnv* env, jclass, jbyteArray a_ary) {
     double scale = pow(2.0, 40);
     GlobalState gs(scale);
@@ -348,21 +348,21 @@ JNIEXPORT jlong JNICALL Java_org_apache_sysds_utils_NativeHelper_initClient
 }
 
 
-JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_generatePartialPublicKey
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_generatePartialPublicKey
   (JNIEnv* env, jclass, jlong client_ptr) {
     Client* client = reinterpret_cast<Client*>(client_ptr);
     return serialize(env, client->partial_public_key().data());
 }
 
 
-JNIEXPORT void JNICALL Java_org_apache_sysds_utils_NativeHelper_setPublicKey
+JNIEXPORT void JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_setPublicKey
   (JNIEnv* env, jclass, jlong client_ptr, jbyteArray serialized_public_key) {
     Client* client = reinterpret_cast<Client*>(client_ptr);
     client->set_public_key(deserialize<PublicKey>(env, client->context(), serialized_public_key));
 }
 
 
-JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_encrypt
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_encrypt
   (JNIEnv* env, jclass, jlong client_ptr, jdoubleArray jdata) {
     Client* client = reinterpret_cast<Client*>(client_ptr);
     size_t slot_count = get_slot_count(client->context());
@@ -385,7 +385,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_encrypt
 }
 
 
-JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_partiallyDecrypt
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_partiallyDecrypt
   (JNIEnv* env, jclass, jlong client_ptr, jbyteArray serialized_ciphertexts) {
     Client* client = reinterpret_cast<Client*>(client_ptr);
     auto input = get_stream(env, serialized_ciphertexts);
@@ -406,7 +406,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_partiallyD
 }
 
 
-JNIEXPORT jlong JNICALL Java_org_apache_sysds_utils_NativeHelper_initServer
+JNIEXPORT jlong JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_initServer
   (JNIEnv *, jclass) {
     double scale = pow(2.0, 40);
     GlobalState gs(scale);
@@ -415,7 +415,7 @@ JNIEXPORT jlong JNICALL Java_org_apache_sysds_utils_NativeHelper_initServer
 }
 
 
-JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_generateA
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_generateA
   (JNIEnv* env, jclass, jlong server_ptr) {
     Server* server = reinterpret_cast<Server*>(server_ptr);
     uint64_t* data = server->a().data();
@@ -426,7 +426,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_generateA
 }
 
 
-JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_aggregatePartialPublicKeys
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_aggregatePartialPublicKeys
   (JNIEnv* env, jclass, jlong server_ptr, jobjectArray partial_public_keys_serialized) {
     Server* server = reinterpret_cast<Server*>(server_ptr);
     size_t num_partial_public_keys = env->GetArrayLength(partial_public_keys_serialized);
@@ -444,7 +444,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_aggregateP
 }
 
 
-JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_accumulateCiphertexts
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_accumulateCiphertexts
   (JNIEnv* env, jclass, jlong server_ptr, jobjectArray ciphertexts_serialized) {
     Server* server = reinterpret_cast<Server*>(server_ptr);
     size_t num_ciphertext_arys = env->GetArrayLength(ciphertexts_serialized);
@@ -484,7 +484,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_accumulate
 }
 
 
-JNIEXPORT jdoubleArray JNICALL Java_org_apache_sysds_utils_NativeHelper_average
+JNIEXPORT jdoubleArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_average
   (JNIEnv* env, jclass, jlong server_ptr, jbyteArray ciphertext_sum_serialized, jobjectArray partial_decryptions_serialized) {
     Server* server = reinterpret_cast<Server*>(server_ptr);
     size_t slot_size = get_slot_count(server->context());

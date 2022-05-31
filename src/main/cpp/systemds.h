@@ -119,7 +119,7 @@ JNIEXPORT void JNICALL Java_org_apache_sysds_utils_NativeHelper_setMaxNumThreads
  * Method:    initClient
  * Signature: ([B)J
  */
-JNIEXPORT jlong JNICALL Java_org_apache_sysds_utils_NativeHelper_initClient
+JNIEXPORT jlong JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_initClient
   (JNIEnv *, jclass, jbyteArray);
 
 /*
@@ -127,7 +127,7 @@ JNIEXPORT jlong JNICALL Java_org_apache_sysds_utils_NativeHelper_initClient
  * Method:    generatePartialPublicKey
  * Signature: (J)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_generatePartialPublicKey
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_generatePartialPublicKey
   (JNIEnv *, jclass, jlong);
 
 /*
@@ -135,7 +135,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_generatePa
  * Method:    setPublicKey
  * Signature: (J[B)V
  */
-JNIEXPORT void JNICALL Java_org_apache_sysds_utils_NativeHelper_setPublicKey
+JNIEXPORT void JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_setPublicKey
   (JNIEnv *, jclass, jlong, jbyteArray);
 
 /*
@@ -143,7 +143,7 @@ JNIEXPORT void JNICALL Java_org_apache_sysds_utils_NativeHelper_setPublicKey
  * Method:    encrypt
  * Signature: (J[D)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_encrypt
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_encrypt
   (JNIEnv *, jclass, jlong, jdoubleArray);
 
 /*
@@ -151,7 +151,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_encrypt
  * Method:    partiallyDecrypt
  * Signature: (J[B)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_partiallyDecrypt
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_partiallyDecrypt
   (JNIEnv *, jclass, jlong, jbyteArray);
 
 /*
@@ -159,7 +159,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_partiallyD
  * Method:    initServer
  * Signature: ()J
  */
-JNIEXPORT jlong JNICALL Java_org_apache_sysds_utils_NativeHelper_initServer
+JNIEXPORT jlong JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_initServer
   (JNIEnv *, jclass);
 
 /*
@@ -167,7 +167,7 @@ JNIEXPORT jlong JNICALL Java_org_apache_sysds_utils_NativeHelper_initServer
  * Method:    generateA
  * Signature: (J)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_generateA
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_generateA
   (JNIEnv *, jclass, jlong);
 
 /*
@@ -175,7 +175,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_generateA
  * Method:    aggregatePartialPublicKeys
  * Signature: (J[[B)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_aggregatePartialPublicKeys
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_aggregatePartialPublicKeys
   (JNIEnv *, jclass, jlong, jobjectArray);
 
 /*
@@ -183,7 +183,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_aggregateP
  * Method:    accumulateCiphertexts
  * Signature: (J[[B)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_accumulateCiphertexts
+JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_accumulateCiphertexts
   (JNIEnv *, jclass, jlong, jobjectArray);
 
 /*
@@ -191,7 +191,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_sysds_utils_NativeHelper_accumulate
  * Method:    average
  * Signature: (J[B[[B)[D
  */
-JNIEXPORT jdoubleArray JNICALL Java_org_apache_sysds_utils_NativeHelper_average
+JNIEXPORT jdoubleArray JNICALL Java_org_apache_sysds_runtime_controlprogram_paramserv_NativeHEHelper_average
   (JNIEnv *, jclass, jlong, jbyteArray, jobjectArray);
 
 #ifdef __cplusplus

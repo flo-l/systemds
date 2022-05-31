@@ -20,18 +20,18 @@
 package org.apache.sysds.runtime.controlprogram.paramserv.homomorphicEncryption;
 
 import org.apache.sysds.runtime.controlprogram.caching.MatrixObject;
+import org.apache.sysds.runtime.controlprogram.paramserv.NativeHEHelper;
 import org.apache.sysds.runtime.data.DenseBlock;
 import org.apache.sysds.runtime.instructions.cp.CiphertextMatrix;
 import org.apache.sysds.runtime.instructions.cp.PlaintextMatrix;
 import org.apache.sysds.runtime.matrix.data.MatrixBlock;
-import org.apache.sysds.utils.NativeHelper;
 
 import java.util.stream.IntStream;
 
 public class SEALClient {
     public SEALClient(byte[] a) {
         // TODO take params here, like slot_count etc.
-        ctx = NativeHelper.initClient(a);
+        ctx = NativeHEHelper.initClient(a);
     }
 
     // this is a pointer to the context used by all native methods of this class
@@ -45,7 +45,7 @@ public class SEALClient {
      * @return the partial public key
      */
     public PublicKey generatePartialPublicKey() {
-        return new PublicKey(NativeHelper.generatePartialPublicKey(ctx));
+        return new PublicKey(NativeHEHelper.generatePartialPublicKey(ctx));
     }
 
     /**
@@ -54,7 +54,7 @@ public class SEALClient {
      * @param public_key the public key to set
      */
     public void setPublicKey(PublicKey public_key) {
-        NativeHelper.setPublicKey(ctx, public_key.getData());
+        NativeHEHelper.setPublicKey(ctx, public_key.getData());
     }
 
     /**
@@ -72,7 +72,7 @@ public class SEALClient {
         DenseBlock db = mb.getDenseBlock();
         int[] dims = IntStream.range(0, db.numDims()).map(db::getDim).toArray();
         double[] raw_data = mb.getDenseBlockValues();
-        return new CiphertextMatrix(dims, plaintext.getDataCharacteristics(), NativeHelper.encrypt(ctx, raw_data));
+        return new CiphertextMatrix(dims, plaintext.getDataCharacteristics(), NativeHEHelper.encrypt(ctx, raw_data));
     }
 
     /**
@@ -83,6 +83,6 @@ public class SEALClient {
      * @return the partial decryption of ciphertext
      */
     public PlaintextMatrix partiallyDecrypt(CiphertextMatrix ciphertext) {
-        return new PlaintextMatrix(ciphertext.getDims(), ciphertext.getDataCharacteristics(), NativeHelper.partiallyDecrypt(ctx, ciphertext.getData()));
+        return new PlaintextMatrix(ciphertext.getDims(), ciphertext.getDataCharacteristics(), NativeHEHelper.partiallyDecrypt(ctx, ciphertext.getData()));
     }
 }
